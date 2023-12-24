@@ -1,8 +1,5 @@
-[package]
-name = "kqlparser"
-version = "0.1.0"
-authors = ["Iwan Timmer <irtimmer@gmail.com>"]
-edition = "2021"
-
-[dependencies]
-nom = "7"
+[workspace]
+workspace.resolver = "2"
+members = [
+    "kqlparser"
+]
