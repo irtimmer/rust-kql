@@ -1,0 +1,11 @@
+[package]
+name = "datafusion-kql"
+version = "0.1.0"
+authors = ["Iwan Timmer <irtimmer@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+kqlparser = { path = "../kqlparser" }
+arrow-schema = { workspace = true }
+datafusion-common = { workspace = true }
+datafusion-expr = { workspace = true }

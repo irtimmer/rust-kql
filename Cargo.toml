@@ -1,5 +1,11 @@
 [workspace]
 workspace.resolver = "2"
 members = [
+    "datafusion-kql",
     "kqlparser"
 ]
+
+[workspace.dependencies]
+arrow-schema = "49.0.0"
+datafusion-common = "34.0.0"
+datafusion-expr = "34.0.0"
