@@ -1,3 +1,14 @@
+#[derive(Debug, PartialEq)]
+pub struct TabularExpression {
+    pub name: String,
+    pub operators: Vec<Operator>
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Operator {
+    Where(Expr)
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Ident(String),

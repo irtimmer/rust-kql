@@ -1,14 +1,14 @@
 use std::str::{self, FromStr};
 
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_until, take_while1};
+use nom::bytes::complete::{tag, tag_no_case, take_until, take_while1};
 use nom::character::complete::{digit1, multispace0, multispace1};
 use nom::combinator::map;
 use nom::multi::{many0, separated_list0, fold_many0};
 use nom::sequence::tuple;
 use nom::IResult;
 
-use super::ast::{Expr, Value};
+use super::ast::{Expr, Operator, TabularExpression, Value};
 use super::is_kql_identifier;
 
 enum AddsubOperator {
@@ -156,4 +156,32 @@ fn parse_or(i: &[u8]) -> IResult<&[u8], Expr> {
         ),
         parse_and,
     ))(i)
+}
+
+pub fn parse_expr(i: &[u8]) -> IResult<&[u8], Expr> {
+    parse_or(i)
+}
+
+fn where_query(i: &[u8]) -> IResult<&[u8], Expr> {
+    let (i, (_, _, e)) = tuple((tag_no_case("where"), multispace1, parse_expr))(i)?;
+    Ok((i, e))
+}
+
+fn parse_operator(i: &[u8]) -> IResult<&[u8], Operator> {
+    alt((
+        map(where_query, |e| Operator::Where(e))
+    ))(i)
+}
+
+pub fn parse_tabular(i: &[u8]) -> IResult<&[u8], TabularExpression> {
+    let (i, id) = take_while1(is_kql_identifier)(i)?;
+    let (i, p) = many0(tuple((multispace0, tag("|"), multispace0, parse_operator)))(i)?;
+
+    Ok((
+        i,
+        TabularExpression {
+            name: FromStr::from_str(str::from_utf8(id).unwrap()).unwrap(),
+            operators: p.into_iter().map(|(_, _, _, x)| x).collect(),
+        },
+    ))
 }
