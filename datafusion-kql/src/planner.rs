@@ -3,6 +3,9 @@ use arrow_schema::DataType;
 use datafusion_common::TableReference;
 use datafusion_common::{DataFusionError, Result};
 
+use datafusion_expr::aggregate_function;
+use datafusion_expr::expr::AggregateFunction;
+use datafusion_expr::expr_fn::col;
 use datafusion_expr::logical_plan::{LogicalPlan, LogicalPlanBuilder};
 use datafusion_expr::{AggregateUDF, Expr, Literal, ScalarUDF, TableSource};
 
@@ -26,6 +29,20 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
         KqlToRel { ctx }
     }
 
+    fn func_to_expr(&self, ctx: &mut PlannerContext, name: &str, args: &Vec<KqlExpr>) -> Result<Expr> {
+        let args = args.iter().map(|a| self.ast_to_expr(ctx, a)).collect::<Result<Vec<Expr>>>()?;
+        Ok(match name {
+            "count" => aggr_func(aggregate_function::AggregateFunction::Count, args),
+            "max" => aggr_func(aggregate_function::AggregateFunction::Max, args),
+            "min" => aggr_func(aggregate_function::AggregateFunction::Min, args),
+            "avg" => aggr_func(aggregate_function::AggregateFunction::Avg, args),
+            "sum" => aggr_func(aggregate_function::AggregateFunction::Sum, args),
+            _ => {
+                return Err(DataFusionError::NotImplemented("Function not implemented".to_string()));
+            }
+        })
+    }
+
     fn ast_to_expr(&self, ctx: &mut PlannerContext, ast: &KqlExpr) -> Result<Expr> {
         Ok(match ast {
             KqlExpr::Equals(x, y) => self.ast_to_expr(ctx, &x)?.eq(self.ast_to_expr(ctx, &y)?),
@@ -43,7 +60,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
             KqlExpr::GreaterOrEqual(x, y) => self.ast_to_expr(ctx, &x)?.gt_eq(self.ast_to_expr(ctx, &y)?),
             KqlExpr::Value(v) => value_to_expr(v),
             KqlExpr::Ident(x) => col(x.as_str()),
-            KqlExpr::Func(_, _) => return Err(DataFusionError::NotImplemented("Functions not implemented".to_string())),
+            KqlExpr::Func(x, y) => self.func_to_expr(ctx, x.as_str(), y)?,
         })
     }
 
@@ -54,6 +71,10 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
         for op in query.operators.into_iter() {
             builder = match op {
                 Operator::Where(x) => builder.filter(self.ast_to_expr(ctx, &x)?)?,
+                Operator::Summarize(x, y) => {
+                    let mut ctx1 = ctx.clone();
+                    builder.aggregate(y.iter().map(|z| self.ast_to_expr(&mut ctx1, z).unwrap()), x.iter().map(|z| self.ast_to_expr(ctx, z).unwrap()))?
+                },
                 _ => return Err(DataFusionError::NotImplemented("Operator not implemented".to_string())),
             };
         }
@@ -75,4 +96,8 @@ fn value_to_expr(val: &Value) -> Expr {
             panic!("Not supported")
         }
     }
+}
+
+fn aggr_func(func: aggregate_function::AggregateFunction, args: Vec<Expr>) -> Expr {
+    Expr::AggregateFunction(AggregateFunction::new(func, args, false, None, None))
 }
