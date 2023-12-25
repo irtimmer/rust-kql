@@ -172,6 +172,29 @@ pub fn parse_expr(i: &[u8]) -> IResult<&[u8], Expr> {
     parse_or(i)
 }
 
+fn join_query(i: &[u8]) -> IResult<&[u8], (TabularExpression, Vec<String>)> {
+    map(
+        tuple((
+            tag_no_case("join"),
+            multispace1,
+            tag("("),
+            parse_tabular,
+            tag(")"),
+            multispace1,
+            tag("on"),
+            multispace1,
+            separated_list0(
+                tag(","),
+                map(
+                    tuple((multispace0, take_while1(is_kql_identifier), multispace0)),
+                    |(_, e, _)| FromStr::from_str(str::from_utf8(e).unwrap()).unwrap(),
+                ),
+            ),
+        )),
+        |(_, _, _, a, _, _, _, _, g)| (a, g),
+    )(i)
+}
+
 fn where_query(i: &[u8]) -> IResult<&[u8], Expr> {
     let (i, (_, _, e)) = tuple((tag_no_case("where"), multispace1, parse_expr))(i)?;
     Ok((i, e))
@@ -215,6 +238,7 @@ fn take_query(i: &[u8]) -> IResult<&[u8], u32> {
 
 fn parse_operator(i: &[u8]) -> IResult<&[u8], Operator> {
     alt((
+        map(join_query, |(a, g)| Operator::Join(a, g)),
         map(summarize_query, |(a, g)| Operator::Summarize(a, g)),
         map(take_query, |t| Operator::Take(t)),
         map(where_query, |e| Operator::Where(e))
