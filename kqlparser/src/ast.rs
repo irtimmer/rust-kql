@@ -6,7 +6,8 @@ pub struct TabularExpression {
 
 #[derive(Debug, PartialEq)]
 pub enum Operator {
-    Where(Expr)
+    Where(Expr),
+    Summarize(Vec<Expr>, Vec<Expr>)
 }
 
 #[derive(Debug, Clone, PartialEq)]

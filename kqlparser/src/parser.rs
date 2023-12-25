@@ -3,8 +3,8 @@ use std::str::{self, FromStr};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, tag_no_case, take_until, take_while1};
 use nom::character::complete::{digit1, multispace0, multispace1};
-use nom::combinator::map;
-use nom::multi::{many0, separated_list0, fold_many0};
+use nom::combinator::{map, opt};
+use nom::multi::{many0, separated_list0, separated_list1, fold_many0};
 use nom::sequence::tuple;
 use nom::IResult;
 
@@ -57,6 +57,16 @@ fn parse_muldiv_op(i: &[u8]) -> IResult<&[u8], MuldivOperator> {
     ))(i)
 }
 
+fn take_identifier(i: &[u8]) -> IResult<&[u8], &[u8]> {
+    let (input, identifier) = take_while1(is_kql_identifier)(i)?;
+
+    // exclude reserved keywords
+    if identifier == b"by" {
+        return Err(nom::Err::Error(nom::error::Error::new(i, nom::error::ErrorKind::Tag)));
+    }
+    Ok((input, identifier))
+}
+
 fn parse_ident(i: &[u8]) -> IResult<&[u8], Expr> {
     alt((
         map(tag("true"), |_| Expr::Value(Value::Bool(true))),
@@ -93,7 +103,7 @@ fn parse_ident(i: &[u8]) -> IResult<&[u8], Expr> {
             )),
             |(n, _, _, x, _)| Expr::Func(FromStr::from_str(str::from_utf8(n).unwrap()).unwrap(), x),
         ),
-        map(take_while1(is_kql_identifier), |i| {
+        map(take_identifier, |i| {
             Expr::Ident(FromStr::from_str(str::from_utf8(i).unwrap()).unwrap())
         }),
     ))(i)
@@ -167,9 +177,33 @@ fn where_query(i: &[u8]) -> IResult<&[u8], Expr> {
     Ok((i, e))
 }
 
+fn summarize_query(i: &[u8]) -> IResult<&[u8], (Vec<Expr>, Vec<Expr>)> {
+    let (i, (a, g)) = map(
+        tuple((
+            tag_no_case("summarize"),
+            multispace1,
+            separated_list0(
+                tag(","),
+                map(tuple((multispace0, parse_expr, multispace0)), |(_, e, _)| e),
+            ),
+            opt(tuple((
+                tag_no_case("by"),
+                multispace1,
+                separated_list1(
+                    tag(","),
+                    map(tuple((multispace0, parse_expr, multispace0)), |(_, e, _)| e),
+                )
+            )))
+        )),
+        |(_, _, a, g)| (a, g.map(|(_, _, g)| g).unwrap_or(vec![])),
+    )(i)?;
+    Ok((i, (a, g)))
+}
+
 fn parse_operator(i: &[u8]) -> IResult<&[u8], Operator> {
     alt((
-        map(where_query, |e| Operator::Where(e))
+        map(where_query, |e| Operator::Where(e)),
+        map(summarize_query, |(a, g)| Operator::Summarize(a, g))
     ))(i)
 }
 
