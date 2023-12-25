@@ -200,10 +200,24 @@ fn summarize_query(i: &[u8]) -> IResult<&[u8], (Vec<Expr>, Vec<Expr>)> {
     Ok((i, (a, g)))
 }
 
+fn take_query(i: &[u8]) -> IResult<&[u8], u32> {
+    map(
+        tuple((
+            alt((tag_no_case("take"), tag_no_case("limit"))),
+            multispace1,
+            map(digit1, |x| {
+                FromStr::from_str(str::from_utf8(x).unwrap()).unwrap()
+            }),
+        )),
+        |(_, _, t)| t,
+    )(i)
+}
+
 fn parse_operator(i: &[u8]) -> IResult<&[u8], Operator> {
     alt((
-        map(where_query, |e| Operator::Where(e)),
-        map(summarize_query, |(a, g)| Operator::Summarize(a, g))
+        map(summarize_query, |(a, g)| Operator::Summarize(a, g)),
+        map(take_query, |t| Operator::Take(t)),
+        map(where_query, |e| Operator::Where(e))
     ))(i)
 }
 
