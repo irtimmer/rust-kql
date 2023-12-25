@@ -1,6 +1,6 @@
 use arrow_schema::DataType;
 
-use datafusion_common::TableReference;
+use datafusion_common::{TableReference, JoinType};
 use datafusion_common::{DataFusionError, Result};
 
 use datafusion_expr::aggregate_function;
@@ -70,6 +70,10 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
 
         for op in query.operators.into_iter() {
             builder = match op {
+                Operator::Join(x, y) => {
+                    let keys: Vec<&str> = y.iter().map(|s| s.as_ref()).collect();
+                    builder.join(self.query_statement_to_plan(ctx, x)?, JoinType::Inner, (keys.clone(), keys), Option::None)?
+                },
                 Operator::Where(x) => builder.filter(self.ast_to_expr(ctx, &x)?)?,
                 Operator::Summarize(x, y) => {
                     let mut ctx1 = ctx.clone();
