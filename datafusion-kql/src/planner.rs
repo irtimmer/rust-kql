@@ -75,6 +75,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
                     let mut ctx1 = ctx.clone();
                     builder.aggregate(y.iter().map(|z| self.ast_to_expr(&mut ctx1, z).unwrap()), x.iter().map(|z| self.ast_to_expr(ctx, z).unwrap()))?
                 },
+                Operator::Take(x) => builder.limit(0, Some(x.try_into().unwrap()))?,
                 _ => return Err(DataFusionError::NotImplemented("Operator not implemented".to_string())),
             };
         }
