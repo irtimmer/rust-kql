@@ -195,6 +195,26 @@ fn join_query(i: &[u8]) -> IResult<&[u8], (TabularExpression, Vec<String>)> {
     )(i)
 }
 
+fn project_query(i: &[u8]) -> IResult<&[u8], Vec<(Option<String>, Expr)>> {
+    map(
+        tuple((
+            tag_no_case("project"),
+            multispace1,
+            separated_list0(
+                tuple((multispace0, tag(","), multispace0)),
+                alt((
+                    map(
+                        tuple((take_while1(is_kql_identifier), multispace0, tag("="), multispace0, parse_expr)),
+                        |(n, _, _, _, e)| (Some(FromStr::from_str(str::from_utf8(n).unwrap()).unwrap()), e)
+                    ),
+                    map(parse_expr, |e| (None, e))
+                )),
+            ),
+        )),
+        |(_, _, x)| x
+    )(i)
+}
+
 fn where_query(i: &[u8]) -> IResult<&[u8], Expr> {
     let (i, (_, _, e)) = tuple((tag_no_case("where"), multispace1, parse_expr))(i)?;
     Ok((i, e))
@@ -239,6 +259,7 @@ fn take_query(i: &[u8]) -> IResult<&[u8], u32> {
 fn parse_operator(i: &[u8]) -> IResult<&[u8], Operator> {
     alt((
         map(join_query, |(a, g)| Operator::Join(a, g)),
+        map(project_query, |p| Operator::Project(p)),
         map(summarize_query, |(a, g)| Operator::Summarize(a, g)),
         map(take_query, |t| Operator::Take(t)),
         map(where_query, |e| Operator::Where(e))
