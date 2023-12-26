@@ -74,6 +74,13 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
                     let keys: Vec<&str> = y.iter().map(|s| s.as_ref()).collect();
                     builder.join(self.query_statement_to_plan(ctx, x)?, JoinType::Inner, (keys.clone(), keys), Option::None)?
                 },
+                Operator::Project(x) => builder.project(x.iter().map(|(a, b)| {
+                    let mut expr = self.ast_to_expr(ctx, b).unwrap();
+                    if let Some(alias) = a {
+                        expr = expr.alias(alias);
+                    }
+                    expr
+                }))?,
                 Operator::Where(x) => builder.filter(self.ast_to_expr(ctx, &x)?)?,
                 Operator::Summarize(x, y) => {
                     let mut ctx1 = ctx.clone();
