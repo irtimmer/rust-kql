@@ -15,7 +15,7 @@ use crate::kql::execute_kql;
 #[derive(Parser)]
 struct Cli {
     #[arg(short, long)]
-    file: PathBuf,
+    file: Vec<PathBuf>,
     query: String
 }
 
@@ -32,9 +32,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let args = Cli::parse();
 
     let ctx = SessionContext::new();
-    let base = args.file.file_stem().unwrap().to_str().unwrap();
-    ctx.register_csv(base, args.file.as_os_str().to_str().unwrap(), CsvReadOptions::default()).await?;
-    execute(&ctx, &args.query).await?;
+    for file in &args.file {
+        let base = file.file_stem().unwrap().to_str().unwrap();
+        ctx.register_csv(base, file.as_os_str().to_str().unwrap(), CsvReadOptions::default()).await?;
+    }
 
+    execute(&ctx, &args.query).await?;
     Ok(())
 }
