@@ -172,6 +172,23 @@ pub fn parse_expr(i: &[u8]) -> IResult<&[u8], Expr> {
     parse_or(i)
 }
 
+fn extend_query(i: &[u8]) -> IResult<&[u8], Vec<(Option<String>, Expr)>> {
+    map(
+        tuple((
+            tag_no_case("extend"),
+            multispace1,
+            separated_list0(
+                tuple((multispace0, tag(","), multispace0)),
+                map(
+                    tuple((take_while1(is_kql_identifier), multispace0, tag("="), multispace0, parse_expr)),
+                    |(n, _, _, _, e)| (Some(FromStr::from_str(str::from_utf8(n).unwrap()).unwrap()), e)
+                ),
+            ),
+        )),
+        |(_, _, x)| x
+    )(i)
+}
+
 fn join_query(i: &[u8]) -> IResult<&[u8], (TabularExpression, Vec<String>)> {
     map(
         tuple((
@@ -258,6 +275,7 @@ fn take_query(i: &[u8]) -> IResult<&[u8], u32> {
 
 fn parse_operator(i: &[u8]) -> IResult<&[u8], Operator> {
     alt((
+        map(extend_query, |e| Operator::Extend(e)),
         map(join_query, |(a, g)| Operator::Join(a, g)),
         map(project_query, |p| Operator::Project(p)),
         map(summarize_query, |(a, g)| Operator::Summarize(a, g)),
