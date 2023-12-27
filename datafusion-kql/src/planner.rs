@@ -70,6 +70,17 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
 
         for op in query.operators.into_iter() {
             builder = match op {
+                Operator::Extend(x) => {
+                    let current_schema = builder.schema().clone();
+                    let current_columns = current_schema.fields().iter().map(|f| Expr::Column(f.qualified_column()));
+                    builder.project(current_columns.chain(x.iter().map(|(a, b)| {
+                        let mut expr = self.ast_to_expr(ctx, b).unwrap();
+                        if let Some(alias) = a {
+                            expr = expr.alias(alias);
+                        }
+                        expr
+                    })))?
+                },
                 Operator::Join(x, y) => {
                     let keys: Vec<&str> = y.iter().map(|s| s.as_ref()).collect();
                     builder.join(self.query_statement_to_plan(ctx, x)?, JoinType::Inner, (keys.clone(), keys), Option::None)?
