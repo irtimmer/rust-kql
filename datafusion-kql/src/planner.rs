@@ -1,6 +1,6 @@
 use arrow_schema::DataType;
 
-use datafusion_common::{TableReference, JoinType};
+use datafusion_common::{TableReference, JoinType, Column};
 use datafusion_common::{DataFusionError, Result};
 
 use datafusion_expr::aggregate_function;
@@ -70,6 +70,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
 
         for op in query.operators.into_iter() {
             builder = match op {
+                Operator::MvExpand(x) => builder.unnest_column(Column::from(x))?,
                 Operator::Extend(x) => {
                     let current_schema = builder.schema().clone();
                     let current_columns = current_schema.fields().iter().map(|f| Expr::Column(f.qualified_column()));
