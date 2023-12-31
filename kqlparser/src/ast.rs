@@ -8,6 +8,7 @@ pub struct TabularExpression {
 pub enum Operator {
     Extend(Vec<(Option<String>, Expr)>),
     Join(TabularExpression, Vec<String>),
+    MvExpand(String),
     Project(Vec<(Option<String>, Expr)>),
     Summarize(Vec<Expr>, Vec<Expr>),
     Take(u32),

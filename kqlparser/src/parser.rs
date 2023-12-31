@@ -212,6 +212,17 @@ fn join_query(i: &[u8]) -> IResult<&[u8], (TabularExpression, Vec<String>)> {
     )(i)
 }
 
+fn mv_expand_query(i: &[u8]) -> IResult<&[u8], String> {
+    map(
+        tuple((
+            tag_no_case("mv-expand"),
+            multispace1,
+            take_identifier,
+        )),
+        |(_, _, g)| FromStr::from_str(str::from_utf8(g).unwrap()).unwrap(),
+    )(i)
+}
+
 fn project_query(i: &[u8]) -> IResult<&[u8], Vec<(Option<String>, Expr)>> {
     map(
         tuple((
@@ -277,6 +288,7 @@ fn parse_operator(i: &[u8]) -> IResult<&[u8], Operator> {
     alt((
         map(extend_query, |e| Operator::Extend(e)),
         map(join_query, |(a, g)| Operator::Join(a, g)),
+        map(mv_expand_query, |e| Operator::MvExpand(e)),
         map(project_query, |p| Operator::Project(p)),
         map(summarize_query, |(a, g)| Operator::Summarize(a, g)),
         map(take_query, |t| Operator::Take(t)),
