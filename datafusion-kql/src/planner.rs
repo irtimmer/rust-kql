@@ -4,13 +4,14 @@ use datafusion_common::{TableReference, JoinType, Column};
 use datafusion_common::{DataFusionError, Result};
 
 use datafusion_expr::aggregate_function;
-use datafusion_expr::expr::AggregateFunction;
+use datafusion_expr::expr::{AggregateFunction, Sort};
 use datafusion_expr::expr_fn::col;
 use datafusion_expr::logical_plan::{LogicalPlan, LogicalPlanBuilder};
 use datafusion_expr::{AggregateUDF, Expr, Literal, ScalarUDF, TableSource};
 
 use kqlparser::ast::{Expr as KqlExpr, Operator, TabularExpression, Value};
 
+use std::iter;
 use std::sync::Arc;
 
 pub trait ContextProvider {
@@ -98,6 +99,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
                     let mut ctx1 = ctx.clone();
                     builder.aggregate(y.iter().map(|z| self.ast_to_expr(&mut ctx1, z).unwrap()), x.iter().map(|z| self.ast_to_expr(ctx, z).unwrap()))?
                 },
+                Operator::Sort(o) => o.iter().fold(builder, |b, c| b.sort(iter::once(Expr::Sort(Sort::new(Box::new(col(c)), false, false)))).unwrap()),
                 Operator::Take(x) => builder.limit(0, Some(x.try_into().unwrap()))?,
                 _ => return Err(DataFusionError::NotImplemented("Operator not implemented".to_string())),
             };
