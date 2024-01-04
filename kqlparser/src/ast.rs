@@ -11,6 +11,7 @@ pub enum Operator {
     MvExpand(String),
     Project(Vec<(Option<String>, Expr)>),
     Summarize(Vec<Expr>, Vec<Expr>),
+    Sort(Vec<String>),
     Take(u32),
     Where(Expr)
 }

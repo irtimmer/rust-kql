@@ -5,7 +5,7 @@ use nom::bytes::complete::{tag, tag_no_case, take_until, take_while1};
 use nom::character::complete::{digit1, multispace0, multispace1};
 use nom::combinator::{map, opt};
 use nom::multi::{many0, separated_list0, separated_list1, fold_many0};
-use nom::sequence::tuple;
+use nom::sequence::{tuple, preceded};
 use nom::IResult;
 
 use super::ast::{Expr, Operator, TabularExpression, Value};
@@ -271,6 +271,16 @@ fn summarize_query(i: &[u8]) -> IResult<&[u8], (Vec<Expr>, Vec<Expr>)> {
     Ok((i, (a, g)))
 }
 
+fn sort_query(i: &[u8]) -> IResult<&[u8], Vec<String>> {
+    preceded(tuple((tag_no_case("sort"), multispace1, tag_no_case("by"))), separated_list1(
+        tag(","),
+        map(
+            tuple((multispace0, take_while1(is_kql_identifier), multispace0)),
+            |(_, e, _)| FromStr::from_str(str::from_utf8(e).unwrap()).unwrap(),
+        ),
+    ))(i)
+}
+
 fn take_query(i: &[u8]) -> IResult<&[u8], u32> {
     map(
         tuple((
@@ -291,6 +301,7 @@ fn parse_operator(i: &[u8]) -> IResult<&[u8], Operator> {
         map(mv_expand_query, |e| Operator::MvExpand(e)),
         map(project_query, |p| Operator::Project(p)),
         map(summarize_query, |(a, g)| Operator::Summarize(a, g)),
+        map(sort_query, |o| Operator::Sort(o)),
         map(take_query, |t| Operator::Take(t)),
         map(where_query, |e| Operator::Where(e))
     ))(i)
