@@ -131,7 +131,7 @@ fn parse_predicate(i: &str) -> IResult<&str, Expr> {
 fn parse_and(i: &str) -> IResult<&str, Expr> {
     alt((
         map(
-            separated_pair(parse_and, trim(tag("and")), parse_or),
+            separated_pair(parse_delim, trim(tag("and")), parse_or),
             |(first, second)| Expr::And(Box::new(first), Box::new(second)),
         ),
         parse_predicate,
