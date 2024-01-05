@@ -1,16 +1,19 @@
 use arrow_schema::DataType;
 
-use datafusion_common::{TableReference, JoinType, Column};
+use datafusion_common::{TableReference, JoinType, Column, DFSchema, DFField};
 use datafusion_common::{DataFusionError, Result};
 
-use datafusion_expr::aggregate_function;
+use datafusion_expr::{aggregate_function, Values};
 use datafusion_expr::expr::{AggregateFunction, Sort};
 use datafusion_expr::expr_fn::col;
 use datafusion_expr::logical_plan::{LogicalPlan, LogicalPlanBuilder};
 use datafusion_expr::{AggregateUDF, Expr, Literal, ScalarUDF, TableSource};
 
-use kqlparser::ast::{Expr as KqlExpr, Operator, Query, Value, Source};
+use itertools::Itertools;
 
+use kqlparser::ast::{Expr as KqlExpr, Operator, Query, Value, Source, Type};
+
+use std::collections::HashMap;
 use std::iter;
 use std::sync::Arc;
 
@@ -67,6 +70,10 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
 
     fn query_statement_to_plan(&self, ctx: &mut PlannerContext, query: Query) -> Result<LogicalPlan> {
         let mut builder = match query.source {
+            Source::Datatable(s, d) => LogicalPlanBuilder::from(LogicalPlan::Values(Values {
+                schema: Arc::new(DFSchema::new_with_metadata(s.iter().map(|(n, t)| DFField::new::<TableReference>(None, n, type_to_datatype(t), true)).collect(), HashMap::default()).unwrap()),
+                values: d.iter().chunks(s.len()).into_iter().map(|chunk| chunk.map(|r| self.ast_to_expr(ctx, r).unwrap()).collect()).collect()
+            })),
             Source::Reference(n) => LogicalPlanBuilder::scan(n.clone(), self.ctx.get_table_provider(TableReference::from(n.as_str()))?, None)?,
             _ => return Err(DataFusionError::NotImplemented("Source not implemented".to_string())),
         };
@@ -112,6 +119,14 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
 
     pub fn query_to_plan(&self, query: Query) -> Result<LogicalPlan> {
         self.query_statement_to_plan(&mut PlannerContext::default(), query)
+    }
+}
+
+fn type_to_datatype(t: &Type) -> DataType {
+    match t {
+        Type::String => DataType::Utf8,
+        Type::Bool => DataType::Boolean,
+        Type::Int => DataType::UInt64,
     }
 }
 

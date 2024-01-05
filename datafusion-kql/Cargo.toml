@@ -9,3 +9,4 @@ kqlparser = { path = "../kqlparser" }
 arrow-schema = { workspace = true }
 datafusion-common = { workspace = true }
 datafusion-expr = { workspace = true }
+itertools = "0.12"
