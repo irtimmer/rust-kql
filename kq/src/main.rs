@@ -3,9 +3,9 @@ use clap::Parser;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::arrow::util::pretty;
 use datafusion::execution::context::SessionContext;
-use datafusion::execution::options::CsvReadOptions;
 
 use std::error::Error;
+use std::ffi::OsStr;
 use std::path::PathBuf;
 
 mod kql;
@@ -34,7 +34,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let ctx = SessionContext::new();
     for file in &args.file {
         let base = file.file_stem().unwrap().to_str().unwrap();
-        ctx.register_csv(base, file.as_os_str().to_str().unwrap(), CsvReadOptions::default()).await?;
+        match file.extension().and_then(OsStr::to_str) {
+            Some("arrow") => ctx.register_avro(base, file.as_os_str().to_str().unwrap(), Default::default()).await?,
+            Some("avro") => ctx.register_avro(base, file.as_os_str().to_str().unwrap(), Default::default()).await?,
+            Some("csv") => ctx.register_csv(base, file.as_os_str().to_str().unwrap(), Default::default()).await?,
+            Some("json") => ctx.register_json(base, file.as_os_str().to_str().unwrap(), Default::default()).await?,
+            Some("parquet") => ctx.register_parquet(base, file.as_os_str().to_str().unwrap(), Default::default()).await?,
+            Some(ext) => return Err(format!("File extension '{}' not supported", ext).into()),
+            None => return Err("File without extension not supported".into()),
+        }
     }
 
     execute(&ctx, &args.query).await?;
