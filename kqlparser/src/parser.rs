@@ -1,8 +1,8 @@
 use std::str::{self, FromStr};
 
 use nom::branch::alt;
-use nom::bytes::complete::{tag, tag_no_case, take_while1, escaped};
-use nom::character::complete::{digit1, multispace0, multispace1, none_of};
+use nom::bytes::complete::{tag, tag_no_case, take_while1, escaped, is_a};
+use nom::character::complete::{digit1, multispace0, multispace1, none_of, one_of};
 use nom::combinator::{map, opt};
 use nom::multi::{many0, separated_list0, separated_list1, fold_many0};
 use nom::sequence::{tuple, preceded, delimited, separated_pair, terminated};
@@ -10,52 +10,6 @@ use nom::IResult;
 
 use super::ast::{Expr, Literal, Operator, Query, Source, Type};
 use super::is_kql_identifier;
-
-enum AddsubOperator {
-    Add,
-    Substract,
-}
-
-enum MuldivOperator {
-    Multiply,
-    Divide,
-    Modulo,
-}
-
-enum PredicateOperator {
-    Equals,
-    NotEquals,
-    Less,
-    Greater,
-    LessOrEqual,
-    GreaterOrEqual
-}
-
-fn parse_predicate_op(i: &str) -> IResult<&str, PredicateOperator> {
-    alt((
-        map(tag("=="), |_| PredicateOperator::Equals),
-        map(tag("!="), |_| PredicateOperator::NotEquals),
-        map(tag("<"), |_| PredicateOperator::Less),
-        map(tag(">"), |_| PredicateOperator::Greater),
-        map(tag("<="), |_| PredicateOperator::LessOrEqual),
-        map(tag(">="), |_| PredicateOperator::GreaterOrEqual)
-    ))(i)
-}
-
-fn parse_addsub_op(i: &str) -> IResult<&str, AddsubOperator> {
-    alt((
-        map(tag("+"), |_| AddsubOperator::Add),
-        map(tag("-"), |_| AddsubOperator::Substract),
-    ))(i)
-}
-
-fn parse_muldiv_op(i: &str) -> IResult<&str, MuldivOperator> {
-    alt((
-        map(tag("*"), |_| MuldivOperator::Multiply),
-        map(tag("/"), |_| MuldivOperator::Divide),
-        map(tag("%"), |_| MuldivOperator::Modulo),
-    ))(i)
-}
 
 fn parse_type(i: &str) -> IResult<&str, Type> {
     alt((
@@ -132,31 +86,35 @@ fn parse_delim(i: &str) -> IResult<&str, Expr> {
 
 fn parse_muldiv(i: &str) -> IResult<&str, Expr> {
     let (i, initial) = parse_delim(i)?;
-    fold_many0(tuple((multispace0, parse_muldiv_op, multispace0, parse_delim)), move || initial.clone(), |acc, (_, o, _, g)| match o {
-        MuldivOperator::Multiply => Expr::Multiply(Box::new(acc), Box::new(g)),
-        MuldivOperator::Divide => Expr::Divide(Box::new(acc), Box::new(g)),
-        MuldivOperator::Modulo => Expr::Modulo(Box::new(acc), Box::new(g)),
+    fold_many0(tuple((multispace0, one_of("*/%"), multispace0, parse_delim)), move || initial.clone(), |acc, (_, o, _, g)| match o {
+        '*' => Expr::Multiply(Box::new(acc), Box::new(g)),
+        '/' => Expr::Divide(Box::new(acc), Box::new(g)),
+        '%' => Expr::Modulo(Box::new(acc), Box::new(g)),
+        _ => unreachable!()
     })(i)
 }
 
 fn parse_addsub(i: &str) -> IResult<&str, Expr> {
     let (i, initial) = parse_muldiv(i)?;
-    fold_many0(tuple((multispace0, parse_addsub_op, multispace0, parse_muldiv)), move || initial.clone(), |acc, (_, o, _, g)| match o {
-        AddsubOperator::Add => Expr::Add(Box::new(acc), Box::new(g)),
-        AddsubOperator::Substract => Expr::Substract(Box::new(acc), Box::new(g)),
+    fold_many0(tuple((multispace0, one_of("+-"), multispace0, parse_muldiv)), move || initial.clone(), |acc, (_, o, _, g)| match o {
+        '+' => Expr::Add(Box::new(acc), Box::new(g)),
+        '-' => Expr::Substract(Box::new(acc), Box::new(g)),
+        _ => unreachable!()
     })(i)
 }
 
 fn parse_predicate(i: &str) -> IResult<&str, Expr> {
     let (i, initial) = parse_addsub(i)?;
-    fold_many0(tuple((multispace0, parse_predicate_op, multispace0, parse_addsub)), move || initial.clone(), |acc, (_, o, _, g)| match o {
-        PredicateOperator::Equals => Expr::Equals(Box::new(acc), Box::new(g)),
-        PredicateOperator::NotEquals => Expr::NotEquals(Box::new(acc), Box::new(g)),
-        PredicateOperator::Less => Expr::Less(Box::new(acc), Box::new(g)),
-        PredicateOperator::Greater => Expr::Greater(Box::new(acc), Box::new(g)),
-        PredicateOperator::LessOrEqual => Expr::LessOrEqual(Box::new(acc), Box::new(g)),
-        PredicateOperator::GreaterOrEqual => Expr::GreaterOrEqual(Box::new(acc), Box::new(g))
-    })(i)
+    let (i, e) = fold_many0(tuple((multispace0, is_a("!=<>"), multispace0, parse_addsub)), move || Ok(initial.clone()), |acc, (_, o, _, g)| acc.and_then(|acc| Ok(match o {
+        "==" => Expr::Equals(Box::new(acc), Box::new(g)),
+        "!=" => Expr::NotEquals(Box::new(acc), Box::new(g)),
+        "<" => Expr::Less(Box::new(acc), Box::new(g)),
+        ">" => Expr::Greater(Box::new(acc), Box::new(g)),
+        "<=" => Expr::LessOrEqual(Box::new(acc), Box::new(g)),
+        ">=" => Expr::GreaterOrEqual(Box::new(acc), Box::new(g)),
+        _ => return Err(nom::Err::Error(nom::error::Error::new(i, nom::error::ErrorKind::Tag)))
+    })))(i)?;
+    Ok((i, e?))
 }
 
 fn parse_and(i: &str) -> IResult<&str, Expr> {
