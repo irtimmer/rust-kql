@@ -1,13 +1,18 @@
 #[derive(Debug, PartialEq)]
-pub struct TabularExpression {
-    pub name: String,
+pub struct Query {
+    pub source: Source,
     pub operators: Vec<Operator>
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Source {
+    Reference(String)
 }
 
 #[derive(Debug, PartialEq)]
 pub enum Operator {
     Extend(Vec<(Option<String>, Expr)>),
-    Join(TabularExpression, Vec<String>),
+    Join(Query, Vec<String>),
     MvExpand(String),
     Project(Vec<(Option<String>, Expr)>),
     Summarize(Vec<Expr>, Vec<Expr>),

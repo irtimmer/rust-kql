@@ -5,10 +5,10 @@ use nom::bytes::complete::{tag, tag_no_case, take_until, take_while1};
 use nom::character::complete::{digit1, multispace0, multispace1};
 use nom::combinator::{map, opt};
 use nom::multi::{many0, separated_list0, separated_list1, fold_many0};
-use nom::sequence::{tuple, preceded};
+use nom::sequence::{tuple, preceded, separated_pair, terminated};
 use nom::IResult;
 
-use super::ast::{Expr, Operator, TabularExpression, Value};
+use super::ast::{Expr, Operator, Query, Source, Value};
 use super::is_kql_identifier;
 
 enum AddsubOperator {
@@ -189,13 +189,13 @@ fn extend_query(i: &[u8]) -> IResult<&[u8], Vec<(Option<String>, Expr)>> {
     )(i)
 }
 
-fn join_query(i: &[u8]) -> IResult<&[u8], (TabularExpression, Vec<String>)> {
+fn join_query(i: &[u8]) -> IResult<&[u8], (Query, Vec<String>)> {
     map(
         tuple((
             tag_no_case("join"),
             multispace1,
             tag("("),
-            parse_tabular,
+            parse_query,
             tag(")"),
             multispace1,
             tag("on"),
@@ -307,15 +307,14 @@ fn parse_operator(i: &[u8]) -> IResult<&[u8], Operator> {
     ))(i)
 }
 
-pub fn parse_tabular(i: &[u8]) -> IResult<&[u8], TabularExpression> {
-    let (i, id) = take_while1(is_kql_identifier)(i)?;
-    let (i, p) = many0(tuple((multispace0, tag("|"), multispace0, parse_operator)))(i)?;
+fn parse_source(i: &[u8]) -> IResult<&[u8], Source> {
+    map(take_while1(is_kql_identifier), |e| Source::Reference(FromStr::from_str(str::from_utf8(e).unwrap()).unwrap()))(i)
+}
 
-    Ok((
-        i,
-        TabularExpression {
-            name: FromStr::from_str(str::from_utf8(id).unwrap()).unwrap(),
-            operators: p.into_iter().map(|(_, _, _, x)| x).collect(),
-        },
-    ))
+pub fn parse_query(i: &[u8]) -> IResult<&[u8], Query> {
+    map(separated_pair(parse_source, multispace0, many0(preceded(terminated(tag("|"), multispace0), parse_operator))),
+    |(source, operators)| Query {
+        source,
+        operators
+    })(i)
 }

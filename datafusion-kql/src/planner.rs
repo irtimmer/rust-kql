@@ -9,7 +9,7 @@ use datafusion_expr::expr_fn::col;
 use datafusion_expr::logical_plan::{LogicalPlan, LogicalPlanBuilder};
 use datafusion_expr::{AggregateUDF, Expr, Literal, ScalarUDF, TableSource};
 
-use kqlparser::ast::{Expr as KqlExpr, Operator, TabularExpression, Value};
+use kqlparser::ast::{Expr as KqlExpr, Operator, Query, Value, Source};
 
 use std::iter;
 use std::sync::Arc;
@@ -65,9 +65,11 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
         })
     }
 
-    fn query_statement_to_plan(&self, ctx: &mut PlannerContext, query: TabularExpression) -> Result<LogicalPlan> {
-        let source = self.ctx.get_table_provider(TableReference::from(query.name.as_str()))?;
-        let mut builder = LogicalPlanBuilder::scan(query.name.clone(), source, None)?;
+    fn query_statement_to_plan(&self, ctx: &mut PlannerContext, query: Query) -> Result<LogicalPlan> {
+        let mut builder = match query.source {
+            Source::Reference(n) => LogicalPlanBuilder::scan(n.clone(), self.ctx.get_table_provider(TableReference::from(n.as_str()))?, None)?,
+            _ => return Err(DataFusionError::NotImplemented("Source not implemented".to_string())),
+        };
 
         for op in query.operators.into_iter() {
             builder = match op {
@@ -108,7 +110,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
         builder.build()
     }
 
-    pub fn query_to_plan(&self, query: TabularExpression) -> Result<LogicalPlan> {
+    pub fn query_to_plan(&self, query: Query) -> Result<LogicalPlan> {
         self.query_statement_to_plan(&mut PlannerContext::default(), query)
     }
 }
