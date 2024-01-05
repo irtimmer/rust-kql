@@ -55,5 +55,5 @@ pub enum Value {
     None,
     String(String),
     Bool(bool),
-    Int(u32)
+    Int(u64)
 }
