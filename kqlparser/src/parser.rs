@@ -4,12 +4,24 @@ use nom::branch::alt;
 use nom::bytes::complete::{tag, tag_no_case, take_while1, escaped, is_a};
 use nom::character::complete::{digit1, multispace0, multispace1, none_of, one_of};
 use nom::combinator::{map, opt};
+use nom::error::ParseError;
 use nom::multi::{many0, separated_list0, separated_list1, fold_many0};
 use nom::sequence::{tuple, preceded, delimited, separated_pair, terminated, pair};
-use nom::IResult;
+use nom::{IResult, InputLength, Parser, InputTake, InputIter, InputTakeAtPosition, AsChar};
 
 use super::ast::{Expr, Literal, Operator, Query, Source, Type};
 use super::is_kql_identifier;
+
+pub fn trim<I, O, E, F>(f: F) -> impl FnMut(I) -> IResult<I, O, E>
+where
+    I: Clone + InputLength + InputTake + InputIter,
+    I: InputTakeAtPosition,
+    <I as InputTakeAtPosition>::Item: AsChar + Clone,
+    F: Parser<I, O, E>,
+    E: ParseError<I>,
+{
+    delimited(multispace0, f, multispace0)
+}
 
 fn parse_type(i: &str) -> IResult<&str, Type> {
     alt((
@@ -21,9 +33,9 @@ fn parse_type(i: &str) -> IResult<&str, Type> {
 
 fn parse_type_mapping(i: &str) -> IResult<&str, Vec<(String, Type)>> {
     separated_list1(tag(","), separated_pair(
-        delimited(multispace0, map(take_identifier, |i| i.to_string()), multispace0),
+        trim(map(take_identifier, |i| i.to_string())),
         tag(":"),
-        delimited(multispace0, parse_type, multispace0)
+        trim(parse_type)
     ))(i)
 }
 
@@ -63,7 +75,7 @@ fn parse_ident(i: &str) -> IResult<&str, Expr> {
                 multispace0,
                 delimited(tag("("), separated_list0(
                     tag(","),
-                    delimited(multispace0, parse_expr, multispace0),
+                    trim(parse_expr),
                 ), tag(")"))
             ),
             |(n, x)| Expr::Func(n.to_string(), x),
@@ -74,14 +86,14 @@ fn parse_ident(i: &str) -> IResult<&str, Expr> {
 
 fn parse_delim(i: &str) -> IResult<&str, Expr> {
     alt((
-        delimited(tag("("), delimited(multispace0, parse_or, multispace0), tag(")")),
+        delimited(tag("("), trim(parse_or), tag(")")),
         parse_ident,
     ))(i)
 }
 
 fn parse_muldiv(i: &str) -> IResult<&str, Expr> {
     let (i, initial) = parse_delim(i)?;
-    fold_many0(tuple((multispace0, one_of("*/%"), multispace0, parse_delim)), move || initial.clone(), |acc, (_, o, _, g)| match o {
+    fold_many0(pair(trim(one_of("*/%")), parse_delim), move || initial.clone(), |acc, (o, g)| match o {
         '*' => Expr::Multiply(Box::new(acc), Box::new(g)),
         '/' => Expr::Divide(Box::new(acc), Box::new(g)),
         '%' => Expr::Modulo(Box::new(acc), Box::new(g)),
@@ -91,7 +103,7 @@ fn parse_muldiv(i: &str) -> IResult<&str, Expr> {
 
 fn parse_addsub(i: &str) -> IResult<&str, Expr> {
     let (i, initial) = parse_muldiv(i)?;
-    fold_many0(tuple((multispace0, one_of("+-"), multispace0, parse_muldiv)), move || initial.clone(), |acc, (_, o, _, g)| match o {
+    fold_many0(pair(trim(one_of("+-")), parse_muldiv), move || initial.clone(), |acc, (o, g)| match o {
         '+' => Expr::Add(Box::new(acc), Box::new(g)),
         '-' => Expr::Substract(Box::new(acc), Box::new(g)),
         _ => unreachable!()
@@ -100,7 +112,7 @@ fn parse_addsub(i: &str) -> IResult<&str, Expr> {
 
 fn parse_predicate(i: &str) -> IResult<&str, Expr> {
     let (i, initial) = parse_addsub(i)?;
-    let (i, e) = fold_many0(tuple((multispace0, is_a("!=<>"), multispace0, parse_addsub)), move || Ok(initial.clone()), |acc, (_, o, _, g)| acc.and_then(|acc| Ok(match o {
+    let (i, e) = fold_many0(pair(trim(is_a("!=<>")), parse_addsub), move || Ok(initial.clone()), |acc, (o, g)| acc.and_then(|acc| Ok(match o {
         "==" => Expr::Equals(Box::new(acc), Box::new(g)),
         "!=" => Expr::NotEquals(Box::new(acc), Box::new(g)),
         "<" => Expr::Less(Box::new(acc), Box::new(g)),
@@ -115,7 +127,7 @@ fn parse_predicate(i: &str) -> IResult<&str, Expr> {
 fn parse_and(i: &str) -> IResult<&str, Expr> {
     alt((
         map(
-            separated_pair(parse_and, delimited(multispace0, tag("and"), multispace0), parse_or),
+            separated_pair(parse_and, trim(tag("and")), parse_or),
             |(first, second)| Expr::And(Box::new(first), Box::new(second)),
         ),
         parse_predicate,
@@ -125,7 +137,7 @@ fn parse_and(i: &str) -> IResult<&str, Expr> {
 fn parse_or(i: &str) -> IResult<&str, Expr> {
     alt((
         map(
-            separated_pair(parse_and, delimited(multispace0, tag("or"), multispace0), parse_or),
+            separated_pair(parse_and, trim(tag("or")), parse_or),
             |(first, second)| Expr::Or(Box::new(first), Box::new(second)),
         ),
         parse_and,
@@ -140,7 +152,7 @@ fn datatable_query(i: &str) -> IResult<&str, (Vec<(String, Type)>, Vec<Expr>)> {
     preceded(terminated(tag_no_case("datatable"), multispace1), separated_pair(
         delimited(tag("("), parse_type_mapping, tag(")")),
         multispace0,
-        delimited(tag("["), separated_list1(tag(","), delimited(multispace0, parse_expr, multispace0)), tag("]"))
+        delimited(tag("["), separated_list1(tag(","), trim(parse_expr)), tag("]"))
     ))(i)
 }
 
@@ -148,7 +160,7 @@ fn extend_query(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     preceded(terminated(tag_no_case("extend"), multispace1), separated_list0(
         tuple((multispace0, tag(","), multispace0)),
         map(
-            separated_pair(take_while1(is_kql_identifier), delimited(multispace0, tag("="), multispace0), parse_expr),
+            separated_pair(take_while1(is_kql_identifier), trim(tag("=")), parse_expr),
             |(n, e)| (Some(n.to_string()), e)
         ),
     ))(i)
@@ -158,7 +170,7 @@ fn externaldata_query(i: &str) -> IResult<&str, (Vec<(String, Type)>, Vec<String
     preceded(terminated(tag_no_case("externaldata"), multispace1), separated_pair(
         delimited(tag("("), parse_type_mapping, tag(")")),
         multispace0,
-        delimited(tag("["), separated_list1(tag(","), delimited(multispace0, parse_string, multispace0)), tag("]"))
+        delimited(tag("["), separated_list1(tag(","), trim(parse_string)), tag("]"))
     ))(i)
 }
 
@@ -168,7 +180,7 @@ fn join_query(i: &str) -> IResult<&str, (Query, Vec<String>)> {
         delimited(multispace1, tag("on"), multispace1),
         separated_list0(
             tag(","),
-            map(delimited(multispace0, take_while1(is_kql_identifier), multispace0), |e: &str| e.to_string()),
+            map(trim(take_while1(is_kql_identifier)), |e: &str| e.to_string()),
         )
     ))(i)
 }
@@ -179,14 +191,14 @@ fn mv_expand_query(i: &str) -> IResult<&str, String> {
 
 fn project_query(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     preceded(terminated(tag_no_case("project"), multispace1), separated_list0(
-        tuple((multispace0, tag(","), multispace0)),
-        alt((
+        tag(","),
+        trim(alt((
             map(
-                separated_pair(take_while1(is_kql_identifier), delimited(multispace0, tag("="), multispace0), parse_expr),
+                separated_pair(take_while1(is_kql_identifier), trim(tag("=")), parse_expr),
                 |(n, e)| (Some(n.to_string()), e)
             ),
             map(parse_expr, |e| (None, e))
-        )),
+        ))),
     ))(i)
 }
 
@@ -196,16 +208,10 @@ fn where_query(i: &str) -> IResult<&str, Expr> {
 
 fn summarize_query(i: &str) -> IResult<&str, (Vec<Expr>, Vec<Expr>)> {
     preceded(terminated(tag_no_case("summarize"), multispace1), pair(
-        separated_list0(
-            tag(","),
-            delimited(multispace0, parse_expr, multispace0),
-        ),
+        separated_list0(tag(","), trim(parse_expr)),
         map(opt(preceded(
             terminated(tag_no_case("by"), multispace1),
-            separated_list1(
-                tag(","),
-                delimited(multispace0, parse_expr, multispace0),
-            )
+            separated_list1(tag(","), trim(parse_expr))
         )), |b| b.unwrap_or_default())
     ))(i)
 }
@@ -213,10 +219,7 @@ fn summarize_query(i: &str) -> IResult<&str, (Vec<Expr>, Vec<Expr>)> {
 fn sort_query(i: &str) -> IResult<&str, Vec<String>> {
     preceded(tuple((tag_no_case("sort"), multispace1, tag_no_case("by"))), separated_list1(
         tag(","),
-        map(
-            tuple((multispace0::<&str, _>, take_while1(is_kql_identifier), multispace0)),
-            |(_, e, _)| e.to_string(),
-        ),
+        trim(map(take_while1(is_kql_identifier), |e: &str| e.to_string()))
     ))(i)
 }
 
