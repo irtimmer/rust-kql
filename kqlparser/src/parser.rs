@@ -239,6 +239,17 @@ fn join_query(i: &str) -> IResult<&str, (Options, Query, Vec<String>)> {
     )))(i)
 }
 
+fn lookup_query(i: &str) -> IResult<&str, (Options, Query, Vec<String>)> {
+    preceded(terminated(tag_no_case("lookup"), multispace1), tuple((
+        terminated(parse_options, multispace0),
+        terminated(delimited(tag("("), parse_query, tag(")")), multispace0),
+        preceded(
+            terminated(tag("on"), multispace1),
+            separated_list0(tag(","), trim(parse_identifier))
+        )
+    )))(i)
+}
+
 fn mv_expand_query(i: &str) -> IResult<&str, String> {
     preceded(terminated(tag_no_case("mv-expand"), multispace1), parse_identifier)(i)
 }
@@ -292,6 +303,7 @@ fn parse_operator(i: &str) -> IResult<&str, Operator> {
         map(facet_query, |(a, g)| Operator::Facet(a, g)),
         map(getschema_query, |_| Operator::Getschema),
         map(join_query, |(o, a, g)| Operator::Join(o, a, g)),
+        map(lookup_query, |(o, a, g)| Operator::Lookup(o, a, g)),
         map(mv_expand_query, |e| Operator::MvExpand(e)),
         map(project_query, |p| Operator::Project(p)),
         map(summarize_query, |(a, g)| Operator::Summarize(a, g)),

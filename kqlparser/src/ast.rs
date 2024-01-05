@@ -26,6 +26,7 @@ pub enum Operator {
     Facet(Vec<String>, Vec<Operator>),
     Getschema,
     Join(Options, Query, Vec<String>),
+    Lookup(Options, Query, Vec<String>),
     MvExpand(String),
     Project(Vec<(Option<String>, Expr)>),
     Summarize(Vec<Expr>, Vec<Expr>),
