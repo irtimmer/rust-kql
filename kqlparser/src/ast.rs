@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+
+pub type Options = HashMap<String, Literal>;
+
 #[derive(Debug, PartialEq)]
 pub struct Query {
     pub source: Source,
@@ -13,6 +17,7 @@ pub enum Source {
 
 #[derive(Debug, PartialEq)]
 pub enum Operator {
+    As(Options, String),
     Extend(Vec<(Option<String>, Expr)>),
     Join(Query, Vec<String>),
     MvExpand(String),

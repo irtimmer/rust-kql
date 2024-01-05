@@ -9,7 +9,7 @@ use nom::multi::{many0, separated_list0, separated_list1, fold_many0};
 use nom::sequence::{tuple, preceded, delimited, separated_pair, terminated, pair};
 use nom::{IResult, InputLength, Parser, InputTake, InputIter, InputTakeAtPosition, AsChar};
 
-use super::ast::{Expr, Literal, Operator, Query, Source, Type};
+use super::ast::{Expr, Literal, Operator, Options, Query, Source, Type};
 use super::is_kql_identifier;
 
 pub fn trim<I, O, E, F>(f: F) -> impl FnMut(I) -> IResult<I, O, E>
@@ -29,6 +29,14 @@ fn parse_type(i: &str) -> IResult<&str, Type> {
         map(tag("bool"), |_| Type::Bool),
         map(tag("int"), |_| Type::Int),
     ))(i)
+}
+
+fn parse_options(i: &str) -> IResult<&str, Options> {
+    map(separated_list0(multispace1, separated_pair(
+        parse_identifier,
+        trim(tag("=")),
+        parse_literal
+    )), |x| x.into_iter().collect())(i)
 }
 
 fn parse_type_mapping(i: &str) -> IResult<&str, Vec<(String, Type)>> {
@@ -152,6 +160,13 @@ pub fn parse_expr(i: &str) -> IResult<&str, Expr> {
     parse_or(i)
 }
 
+fn as_query(i: &str) -> IResult<&str, (Options, String)> {
+    preceded(terminated(tag_no_case("as"), multispace1), map(
+        pair(opt(terminated(parse_options, multispace1)), parse_identifier),
+        |(o, a)| (o.unwrap_or_default(), a)
+    ))(i)
+}
+
 fn datatable_query(i: &str) -> IResult<&str, (Vec<(String, Type)>, Vec<Expr>)> {
     preceded(terminated(tag_no_case("datatable"), multispace1), separated_pair(
         delimited(tag("("), parse_type_mapping, tag(")")),
@@ -227,6 +242,7 @@ fn take_query(i: &str) -> IResult<&str, u32> {
 
 fn parse_operator(i: &str) -> IResult<&str, Operator> {
     alt((
+        map(as_query, |(o, a)| Operator::As(o, a)),
         map(extend_query, |e| Operator::Extend(e)),
         map(join_query, |(a, g)| Operator::Join(a, g)),
         map(mv_expand_query, |e| Operator::MvExpand(e)),
