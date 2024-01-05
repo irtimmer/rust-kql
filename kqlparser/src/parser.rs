@@ -289,6 +289,13 @@ fn where_query(i: &str) -> IResult<&str, Expr> {
     preceded(terminated(tag_no_case("where"), multispace1), parse_expr)(i)
 }
 
+fn sample_query(i: &str) -> IResult<&str, u32> {
+    preceded(
+        terminated(tag_no_case("sample"), multispace1),
+        map(digit1, |x| FromStr::from_str(x).unwrap())
+    )(i)
+}
+
 fn summarize_query(i: &str) -> IResult<&str, (Vec<Expr>, Vec<Expr>)> {
     preceded(terminated(tag_no_case("summarize"), multispace1), pair(
         separated_list0(tag(","), trim(parse_expr)),
@@ -332,6 +339,7 @@ fn parse_operator(i: &str) -> IResult<&str, Operator> {
             map(project_keep_query, |p| Operator::ProjectKeep(p)),
             map(project_rename_query, |p| Operator::ProjectRename(p))
         )),
+        map(sample_query, |s| Operator::Sample(s)),
         map(summarize_query, |(a, g)| Operator::Summarize(a, g)),
         map(sort_query, |o| Operator::Sort(o)),
         map(take_query, |t| Operator::Take(t)),
