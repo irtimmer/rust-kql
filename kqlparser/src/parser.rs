@@ -213,6 +213,17 @@ fn externaldata_query(i: &str) -> IResult<&str, (Vec<(String, Type)>, Vec<String
     ))(i)
 }
 
+fn facet_query(i: &str) -> IResult<&str, (Vec<String>, Vec<Operator>)> {
+    preceded(terminated(separated_pair(tag_no_case("facet"), multispace1, tag_no_case("by")), multispace1), pair(
+        separated_list0(tag(","), trim(parse_identifier)),
+        map(opt(preceded(terminated(tag("with"), multispace0), delimited(
+            tag("("),
+            separated_list1(tag("|"), trim(parse_operator)),
+            tag(")")
+        ))), |o| o.unwrap_or_default())
+    ))(i)
+}
+
 fn join_query(i: &str) -> IResult<&str, (Options, Query, Vec<String>)> {
     preceded(terminated(tag_no_case("join"), multispace1), tuple((
         terminated(parse_options, multispace0),
@@ -274,6 +285,7 @@ fn parse_operator(i: &str) -> IResult<&str, Operator> {
         map(distinct_query, |c| Operator::Distinct(c)),
         map(evaluate_query, |(o, n, x)| Operator::Evaluate(o, n, x)),
         map(extend_query, |e| Operator::Extend(e)),
+        map(facet_query, |(a, g)| Operator::Facet(a, g)),
         map(join_query, |(o, a, g)| Operator::Join(o, a, g)),
         map(mv_expand_query, |e| Operator::MvExpand(e)),
         map(project_query, |p| Operator::Project(p)),
