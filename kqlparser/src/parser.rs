@@ -264,6 +264,13 @@ fn project_query(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     ))(i)
 }
 
+fn project_away_query(i: &str) -> IResult<&str, Vec<String>> {
+    preceded(terminated(tag_no_case("project-away"), multispace1), separated_list1(
+        tag(","),
+        trim(parse_identifier)
+    ))(i)
+}
+
 fn where_query(i: &str) -> IResult<&str, Expr> {
     preceded(terminated(tag_no_case("where"), multispace1), parse_expr)(i)
 }
@@ -305,7 +312,10 @@ fn parse_operator(i: &str) -> IResult<&str, Operator> {
         map(join_query, |(o, a, g)| Operator::Join(o, a, g)),
         map(lookup_query, |(o, a, g)| Operator::Lookup(o, a, g)),
         map(mv_expand_query, |e| Operator::MvExpand(e)),
-        map(project_query, |p| Operator::Project(p)),
+        alt((
+            map(project_query, |p| Operator::Project(p)),
+            map(project_away_query, |p| Operator::ProjectAway(p))
+        )),
         map(summarize_query, |(a, g)| Operator::Summarize(a, g)),
         map(sort_query, |o| Operator::Sort(o)),
         map(take_query, |t| Operator::Take(t)),

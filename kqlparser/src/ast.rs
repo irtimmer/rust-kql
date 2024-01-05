@@ -29,6 +29,7 @@ pub enum Operator {
     Lookup(Options, Query, Vec<String>),
     MvExpand(String),
     Project(Vec<(Option<String>, Expr)>),
+    ProjectAway(Vec<String>),
     Summarize(Vec<Expr>, Vec<Expr>),
     Sort(Vec<String>),
     Take(u32),
