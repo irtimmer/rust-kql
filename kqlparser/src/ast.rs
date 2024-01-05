@@ -19,6 +19,7 @@ pub enum Source {
 pub enum Operator {
     As(Options, String),
     Consume(Options),
+    Count,
     Extend(Vec<(Option<String>, Expr)>),
     Join(Query, Vec<String>),
     MvExpand(String),

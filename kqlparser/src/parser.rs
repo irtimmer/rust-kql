@@ -171,6 +171,10 @@ fn consume_query(i: &str) -> IResult<&str, Options> {
     preceded(terminated(tag_no_case("consume"), multispace1), parse_options)(i)
 }
 
+fn count_query(i: &str) -> IResult<&str, ()> {
+    map(terminated(tag_no_case("count"), multispace1), |_| ())(i)
+}
+
 fn datatable_query(i: &str) -> IResult<&str, (Vec<(String, Type)>, Vec<Expr>)> {
     preceded(terminated(tag_no_case("datatable"), multispace1), separated_pair(
         delimited(tag("("), parse_type_mapping, tag(")")),
@@ -248,6 +252,7 @@ fn parse_operator(i: &str) -> IResult<&str, Operator> {
     alt((
         map(as_query, |(o, a)| Operator::As(o, a)),
         map(consume_query, |o| Operator::Consume(o)),
+        map(count_query, |_| Operator::Count),
         map(extend_query, |e| Operator::Extend(e)),
         map(join_query, |(a, g)| Operator::Join(a, g)),
         map(mv_expand_query, |e| Operator::MvExpand(e)),
