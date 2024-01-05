@@ -30,6 +30,7 @@ pub enum Operator {
     MvExpand(String),
     Project(Vec<(Option<String>, Expr)>),
     ProjectAway(Vec<String>),
+    ProjectKeep(Vec<String>),
     Summarize(Vec<Expr>, Vec<Expr>),
     Sort(Vec<String>),
     Take(u32),
