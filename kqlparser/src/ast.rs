@@ -18,6 +18,7 @@ pub enum Source {
 #[derive(Debug, PartialEq)]
 pub enum Operator {
     As(Options, String),
+    Consume(Options),
     Extend(Vec<(Option<String>, Expr)>),
     Join(Query, Vec<String>),
     MvExpand(String),
