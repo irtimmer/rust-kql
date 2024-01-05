@@ -44,7 +44,7 @@ pub async fn execute_kql(state: &SessionState, query: &str) -> Result<LogicalPla
     }
 
     let kql = KqlToRel::new(&provider);
-    let query = parse_query(query.as_bytes()).unwrap().1;
+    let query = parse_query(&query).unwrap().1;
     kql.query_to_plan(query)
 }
 

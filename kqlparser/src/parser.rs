@@ -1,8 +1,8 @@
 use std::str::{self, FromStr};
 
 use nom::branch::alt;
-use nom::bytes::complete::{tag, tag_no_case, take_until, take_while1};
-use nom::character::complete::{digit1, multispace0, multispace1};
+use nom::bytes::complete::{tag, tag_no_case, take_while1, escaped};
+use nom::character::complete::{digit1, multispace0, multispace1, none_of};
 use nom::combinator::{map, opt};
 use nom::multi::{many0, separated_list0, separated_list1, fold_many0};
 use nom::sequence::{tuple, preceded, delimited, separated_pair, terminated};
@@ -31,7 +31,7 @@ enum PredicateOperator {
     GreaterOrEqual
 }
 
-fn parse_predicate_op(i: &[u8]) -> IResult<&[u8], PredicateOperator> {
+fn parse_predicate_op(i: &str) -> IResult<&str, PredicateOperator> {
     alt((
         map(tag("=="), |_| PredicateOperator::Equals),
         map(tag("!="), |_| PredicateOperator::NotEquals),
@@ -42,14 +42,14 @@ fn parse_predicate_op(i: &[u8]) -> IResult<&[u8], PredicateOperator> {
     ))(i)
 }
 
-fn parse_addsub_op(i: &[u8]) -> IResult<&[u8], AddsubOperator> {
+fn parse_addsub_op(i: &str) -> IResult<&str, AddsubOperator> {
     alt((
         map(tag("+"), |_| AddsubOperator::Add),
         map(tag("-"), |_| AddsubOperator::Substract),
     ))(i)
 }
 
-fn parse_muldiv_op(i: &[u8]) -> IResult<&[u8], MuldivOperator> {
+fn parse_muldiv_op(i: &str) -> IResult<&str, MuldivOperator> {
     alt((
         map(tag("*"), |_| MuldivOperator::Multiply),
         map(tag("/"), |_| MuldivOperator::Divide),
@@ -57,7 +57,7 @@ fn parse_muldiv_op(i: &[u8]) -> IResult<&[u8], MuldivOperator> {
     ))(i)
 }
 
-fn parse_type(i: &[u8]) -> IResult<&[u8], Type> {
+fn parse_type(i: &str) -> IResult<&str, Type> {
     alt((
         map(tag("string"), |_| Type::String),
         map(tag("bool"), |_| Type::Bool),
@@ -65,52 +65,44 @@ fn parse_type(i: &[u8]) -> IResult<&[u8], Type> {
     ))(i)
 }
 
-fn parse_type_mapping(i: &[u8]) -> IResult<&[u8], Vec<(String, Type)>> {
+fn parse_type_mapping(i: &str) -> IResult<&str, Vec<(String, Type)>> {
     separated_list1(tag(","), separated_pair(
-        delimited(multispace0, map(take_identifier, |i| FromStr::from_str(str::from_utf8(i).unwrap()).unwrap()), multispace0),
+        delimited(multispace0, map(take_identifier, |i| i.to_string()), multispace0),
         tag(":"),
         delimited(multispace0, parse_type, multispace0)
     ))(i)
 }
 
-fn take_identifier(i: &[u8]) -> IResult<&[u8], &[u8]> {
+fn take_identifier(i: &str) -> IResult<&str, &str> {
     let (input, identifier) = take_while1(is_kql_identifier)(i)?;
 
     // exclude reserved keywords
-    if identifier == b"by" {
+    if identifier == "by" {
         return Err(nom::Err::Error(nom::error::Error::new(i, nom::error::ErrorKind::Tag)));
     }
     Ok((input, identifier))
 }
 
-fn parse_string(i: &[u8]) -> IResult<&[u8], String> {
+fn parse_string(i: &str) -> IResult<&str, String> {
+    map(alt((
+        delimited(tag("\""), alt((escaped(none_of::<&str, _, _>("\\\""), '\\', tag("\"")), tag(""))), tag("\"")),
+        delimited(tag("'"), alt((escaped(none_of::<&str, _, _>("\\'"), '\\', tag("'")), tag(""))), tag("'"))
+    )), |s| s.to_string())(i)
+}
+
+fn parse_literal(i: &str) -> IResult<&str, Literal> {
     alt((
-        map(
-            tuple((tag("'"), take_until("'"), tag("'"))),
-            |(_, s, _)| {
-                FromStr::from_str(str::from_utf8(s).unwrap()).unwrap()
-            },
-        ),
-        map(
-            tuple((tag("\""), take_until("\""), tag("\""))),
-            |(_, s, _)| {
-                FromStr::from_str(str::from_utf8(s).unwrap()).unwrap()
-            },
-        ),
+        map(tag("true"), |_| Literal::Bool(true)),
+        map(tag("false"), |_| Literal::Bool(false)),
+        map(tag("None"), |_| Literal::None),
+        map(digit1, |x| Literal::Int(FromStr::from_str(x).unwrap())),
+        map(parse_string, |s| Literal::String(s)),
     ))(i)
 }
 
-fn parse_ident(i: &[u8]) -> IResult<&[u8], Expr> {
+fn parse_ident(i: &str) -> IResult<&str, Expr> {
     alt((
-        map(tag("true"), |_| Expr::Literal(Literal::Bool(true))),
-        map(tag("false"), |_| Expr::Literal(Literal::Bool(false))),
-        map(tag("None"), |_| Expr::Literal(Literal::None)),
-        map(digit1, |x| {
-            Expr::Literal(Literal::Int(
-                FromStr::from_str(str::from_utf8(x).unwrap()).unwrap(),
-            ))
-        }),
-        map(parse_string, |s| Expr::Literal(Literal::String(s))),
+        map(parse_literal, |l| Expr::Literal(l)),
         map(
             tuple((
                 take_while1(is_kql_identifier),
@@ -122,15 +114,13 @@ fn parse_ident(i: &[u8]) -> IResult<&[u8], Expr> {
                 ),
                 tag(")"),
             )),
-            |(n, _, _, x, _)| Expr::Func(FromStr::from_str(str::from_utf8(n).unwrap()).unwrap(), x),
+            |(n, _, _, x, _)| Expr::Func(n.to_string(), x),
         ),
-        map(take_identifier, |i| {
-            Expr::Ident(FromStr::from_str(str::from_utf8(i).unwrap()).unwrap())
-        }),
+        map(take_identifier, |i| Expr::Ident(i.to_string())),
     ))(i)
 }
 
-fn parse_delim(i: &[u8]) -> IResult<&[u8], Expr> {
+fn parse_delim(i: &str) -> IResult<&str, Expr> {
     alt((
         map(
             tuple((tag("("), multispace0, parse_or, multispace0, tag(")"))),
@@ -140,7 +130,7 @@ fn parse_delim(i: &[u8]) -> IResult<&[u8], Expr> {
     ))(i)
 }
 
-fn parse_muldiv(i: &[u8]) -> IResult<&[u8], Expr> {
+fn parse_muldiv(i: &str) -> IResult<&str, Expr> {
     let (i, initial) = parse_delim(i)?;
     fold_many0(tuple((multispace0, parse_muldiv_op, multispace0, parse_delim)), move || initial.clone(), |acc, (_, o, _, g)| match o {
         MuldivOperator::Multiply => Expr::Multiply(Box::new(acc), Box::new(g)),
@@ -149,7 +139,7 @@ fn parse_muldiv(i: &[u8]) -> IResult<&[u8], Expr> {
     })(i)
 }
 
-fn parse_addsub(i: &[u8]) -> IResult<&[u8], Expr> {
+fn parse_addsub(i: &str) -> IResult<&str, Expr> {
     let (i, initial) = parse_muldiv(i)?;
     fold_many0(tuple((multispace0, parse_addsub_op, multispace0, parse_muldiv)), move || initial.clone(), |acc, (_, o, _, g)| match o {
         AddsubOperator::Add => Expr::Add(Box::new(acc), Box::new(g)),
@@ -157,7 +147,7 @@ fn parse_addsub(i: &[u8]) -> IResult<&[u8], Expr> {
     })(i)
 }
 
-fn parse_predicate(i: &[u8]) -> IResult<&[u8], Expr> {
+fn parse_predicate(i: &str) -> IResult<&str, Expr> {
     let (i, initial) = parse_addsub(i)?;
     fold_many0(tuple((multispace0, parse_predicate_op, multispace0, parse_addsub)), move || initial.clone(), |acc, (_, o, _, g)| match o {
         PredicateOperator::Equals => Expr::Equals(Box::new(acc), Box::new(g)),
@@ -169,7 +159,7 @@ fn parse_predicate(i: &[u8]) -> IResult<&[u8], Expr> {
     })(i)
 }
 
-fn parse_and(i: &[u8]) -> IResult<&[u8], Expr> {
+fn parse_and(i: &str) -> IResult<&str, Expr> {
     alt((
         map(
             tuple((parse_delim, multispace0, tag("and"), multispace0, parse_or)),
@@ -179,7 +169,7 @@ fn parse_and(i: &[u8]) -> IResult<&[u8], Expr> {
     ))(i)
 }
 
-fn parse_or(i: &[u8]) -> IResult<&[u8], Expr> {
+fn parse_or(i: &str) -> IResult<&str, Expr> {
     alt((
         map(
             tuple((parse_and, multispace0, tag("or"), multispace0, parse_or)),
@@ -189,11 +179,11 @@ fn parse_or(i: &[u8]) -> IResult<&[u8], Expr> {
     ))(i)
 }
 
-pub fn parse_expr(i: &[u8]) -> IResult<&[u8], Expr> {
+pub fn parse_expr(i: &str) -> IResult<&str, Expr> {
     parse_or(i)
 }
 
-fn datatable_query(i: &[u8]) -> IResult<&[u8], (Vec<(String, Type)>, Vec<Expr>)> {
+fn datatable_query(i: &str) -> IResult<&str, (Vec<(String, Type)>, Vec<Expr>)> {
     preceded(terminated(tag_no_case("datatable"), multispace1), separated_pair(
         delimited(tag("("), parse_type_mapping, tag(")")),
         multispace0,
@@ -201,7 +191,7 @@ fn datatable_query(i: &[u8]) -> IResult<&[u8], (Vec<(String, Type)>, Vec<Expr>)>
     ))(i)
 }
 
-fn extend_query(i: &[u8]) -> IResult<&[u8], Vec<(Option<String>, Expr)>> {
+fn extend_query(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     map(
         tuple((
             tag_no_case("extend"),
@@ -210,7 +200,7 @@ fn extend_query(i: &[u8]) -> IResult<&[u8], Vec<(Option<String>, Expr)>> {
                 tuple((multispace0, tag(","), multispace0)),
                 map(
                     tuple((take_while1(is_kql_identifier), multispace0, tag("="), multispace0, parse_expr)),
-                    |(n, _, _, _, e)| (Some(FromStr::from_str(str::from_utf8(n).unwrap()).unwrap()), e)
+                    |(n, _, _, _, e)| (Some(n.to_string()), e)
                 ),
             ),
         )),
@@ -218,7 +208,7 @@ fn extend_query(i: &[u8]) -> IResult<&[u8], Vec<(Option<String>, Expr)>> {
     )(i)
 }
 
-fn externaldata_query(i: &[u8]) -> IResult<&[u8], (Vec<(String, Type)>, Vec<String>)> {
+fn externaldata_query(i: &str) -> IResult<&str, (Vec<(String, Type)>, Vec<String>)> {
     preceded(tuple((tag_no_case("externaldata"), multispace1)), separated_pair(
         delimited(tag("("), parse_type_mapping, tag(")")),
         multispace0,
@@ -226,7 +216,7 @@ fn externaldata_query(i: &[u8]) -> IResult<&[u8], (Vec<(String, Type)>, Vec<Stri
     ))(i)
 }
 
-fn join_query(i: &[u8]) -> IResult<&[u8], (Query, Vec<String>)> {
+fn join_query(i: &str) -> IResult<&str, (Query, Vec<String>)> {
     map(
         tuple((
             tag_no_case("join"),
@@ -240,8 +230,8 @@ fn join_query(i: &[u8]) -> IResult<&[u8], (Query, Vec<String>)> {
             separated_list0(
                 tag(","),
                 map(
-                    tuple((multispace0, take_while1(is_kql_identifier), multispace0)),
-                    |(_, e, _)| FromStr::from_str(str::from_utf8(e).unwrap()).unwrap(),
+                    tuple((multispace0::<&str, _>, take_while1(is_kql_identifier), multispace0)),
+                    |(_, e, _)| e.to_string(),
                 ),
             ),
         )),
@@ -249,18 +239,18 @@ fn join_query(i: &[u8]) -> IResult<&[u8], (Query, Vec<String>)> {
     )(i)
 }
 
-fn mv_expand_query(i: &[u8]) -> IResult<&[u8], String> {
+fn mv_expand_query(i: &str) -> IResult<&str, String> {
     map(
         tuple((
             tag_no_case("mv-expand"),
             multispace1,
             take_identifier,
         )),
-        |(_, _, g)| FromStr::from_str(str::from_utf8(g).unwrap()).unwrap(),
+        |(_, _, g)| g.to_string(),
     )(i)
 }
 
-fn project_query(i: &[u8]) -> IResult<&[u8], Vec<(Option<String>, Expr)>> {
+fn project_query(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     map(
         tuple((
             tag_no_case("project"),
@@ -270,7 +260,7 @@ fn project_query(i: &[u8]) -> IResult<&[u8], Vec<(Option<String>, Expr)>> {
                 alt((
                     map(
                         tuple((take_while1(is_kql_identifier), multispace0, tag("="), multispace0, parse_expr)),
-                        |(n, _, _, _, e)| (Some(FromStr::from_str(str::from_utf8(n).unwrap()).unwrap()), e)
+                        |(n, _, _, _, e)| (Some(n.to_string()), e)
                     ),
                     map(parse_expr, |e| (None, e))
                 )),
@@ -280,12 +270,12 @@ fn project_query(i: &[u8]) -> IResult<&[u8], Vec<(Option<String>, Expr)>> {
     )(i)
 }
 
-fn where_query(i: &[u8]) -> IResult<&[u8], Expr> {
+fn where_query(i: &str) -> IResult<&str, Expr> {
     let (i, (_, _, e)) = tuple((tag_no_case("where"), multispace1, parse_expr))(i)?;
     Ok((i, e))
 }
 
-fn summarize_query(i: &[u8]) -> IResult<&[u8], (Vec<Expr>, Vec<Expr>)> {
+fn summarize_query(i: &str) -> IResult<&str, (Vec<Expr>, Vec<Expr>)> {
     let (i, (a, g)) = map(
         tuple((
             tag_no_case("summarize"),
@@ -308,30 +298,28 @@ fn summarize_query(i: &[u8]) -> IResult<&[u8], (Vec<Expr>, Vec<Expr>)> {
     Ok((i, (a, g)))
 }
 
-fn sort_query(i: &[u8]) -> IResult<&[u8], Vec<String>> {
+fn sort_query(i: &str) -> IResult<&str, Vec<String>> {
     preceded(tuple((tag_no_case("sort"), multispace1, tag_no_case("by"))), separated_list1(
         tag(","),
         map(
-            tuple((multispace0, take_while1(is_kql_identifier), multispace0)),
-            |(_, e, _)| FromStr::from_str(str::from_utf8(e).unwrap()).unwrap(),
+            tuple((multispace0::<&str, _>, take_while1(is_kql_identifier), multispace0)),
+            |(_, e, _)| e.to_string(),
         ),
     ))(i)
 }
 
-fn take_query(i: &[u8]) -> IResult<&[u8], u32> {
+fn take_query(i: &str) -> IResult<&str, u32> {
     map(
         tuple((
             alt((tag_no_case("take"), tag_no_case("limit"))),
             multispace1,
-            map(digit1, |x| {
-                FromStr::from_str(str::from_utf8(x).unwrap()).unwrap()
-            }),
+            map(digit1, |x| FromStr::from_str(x).unwrap()),
         )),
         |(_, _, t)| t,
     )(i)
 }
 
-fn parse_operator(i: &[u8]) -> IResult<&[u8], Operator> {
+fn parse_operator(i: &str) -> IResult<&str, Operator> {
     alt((
         map(extend_query, |e| Operator::Extend(e)),
         map(join_query, |(a, g)| Operator::Join(a, g)),
@@ -344,15 +332,15 @@ fn parse_operator(i: &[u8]) -> IResult<&[u8], Operator> {
     ))(i)
 }
 
-fn parse_source(i: &[u8]) -> IResult<&[u8], Source> {
+fn parse_source(i: &str) -> IResult<&str, Source> {
     alt((
         map(datatable_query, |(a, g)| Source::Datatable(a, g)),
         map(externaldata_query, |(t, c)| Source::Externaldata(t, c)),
-        map(take_while1(is_kql_identifier), |e| Source::Reference(FromStr::from_str(str::from_utf8(e).unwrap()).unwrap()))
+        map(take_while1(is_kql_identifier), |e: &str| Source::Reference(e.to_string()))
     ))(i)
 }
 
-pub fn parse_query(i: &[u8]) -> IResult<&[u8], Query> {
+pub fn parse_query(i: &str) -> IResult<&str, Query> {
     map(separated_pair(parse_source, multispace0, many0(preceded(terminated(tag("|"), multispace0), parse_operator))),
     |(source, operators)| Query {
         source,
