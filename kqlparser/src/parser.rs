@@ -213,12 +213,15 @@ fn externaldata_query(i: &str) -> IResult<&str, (Vec<(String, Type)>, Vec<String
     ))(i)
 }
 
-fn join_query(i: &str) -> IResult<&str, (Query, Vec<String>)> {
-    preceded(terminated(tag_no_case("join"), multispace1), separated_pair(
-        delimited(tag("("), parse_query, tag(")")),
-        delimited(multispace1, tag("on"), multispace1),
-        separated_list0(tag(","), trim(parse_identifier))
-    ))(i)
+fn join_query(i: &str) -> IResult<&str, (Options, Query, Vec<String>)> {
+    preceded(terminated(tag_no_case("join"), multispace1), tuple((
+        terminated(parse_options, multispace0),
+        terminated(delimited(tag("("), parse_query, tag(")")), multispace0),
+        preceded(
+            terminated(tag("on"), multispace1),
+            separated_list0(tag(","), trim(parse_identifier))
+        )
+    )))(i)
 }
 
 fn mv_expand_query(i: &str) -> IResult<&str, String> {
@@ -271,7 +274,7 @@ fn parse_operator(i: &str) -> IResult<&str, Operator> {
         map(distinct_query, |c| Operator::Distinct(c)),
         map(evaluate_query, |(o, n, x)| Operator::Evaluate(o, n, x)),
         map(extend_query, |e| Operator::Extend(e)),
-        map(join_query, |(a, g)| Operator::Join(a, g)),
+        map(join_query, |(o, a, g)| Operator::Join(o, a, g)),
         map(mv_expand_query, |e| Operator::MvExpand(e)),
         map(project_query, |p| Operator::Project(p)),
         map(summarize_query, |(a, g)| Operator::Summarize(a, g)),

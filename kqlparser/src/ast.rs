@@ -23,7 +23,7 @@ pub enum Operator {
     Distinct(Vec<String>),
     Evaluate(Options, String, Vec<Expr>),
     Extend(Vec<(Option<String>, Expr)>),
-    Join(Query, Vec<String>),
+    Join(Options, Query, Vec<String>),
     MvExpand(String),
     Project(Vec<(Option<String>, Expr)>),
     Summarize(Vec<Expr>, Vec<Expr>),

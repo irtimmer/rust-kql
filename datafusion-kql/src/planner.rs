@@ -92,7 +92,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
                         expr
                     })))?
                 },
-                Operator::Join(x, y) => {
+                Operator::Join(_, x, y) => {
                     let keys: Vec<&str> = y.iter().map(|s| s.as_ref()).collect();
                     builder.join(self.query_statement_to_plan(ctx, x)?, JoinType::Inner, (keys.clone(), keys), Option::None)?
                 },
