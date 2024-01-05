@@ -183,6 +183,13 @@ fn datatable_query(i: &str) -> IResult<&str, (Vec<(String, Type)>, Vec<Expr>)> {
     ))(i)
 }
 
+fn distinct_query(i: &str) -> IResult<&str, Vec<String>> {
+    preceded(terminated(tag_no_case("distinct"), multispace1), separated_list1(
+        tag(","),
+        trim(parse_identifier)
+    ))(i)
+}
+
 fn extend_query(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     preceded(terminated(tag_no_case("extend"), multispace1), separated_list0(
         tuple((multispace0, tag(","), multispace0)),
@@ -253,6 +260,7 @@ fn parse_operator(i: &str) -> IResult<&str, Operator> {
         map(as_query, |(o, a)| Operator::As(o, a)),
         map(consume_query, |o| Operator::Consume(o)),
         map(count_query, |_| Operator::Count),
+        map(distinct_query, |c| Operator::Distinct(c)),
         map(extend_query, |e| Operator::Extend(e)),
         map(join_query, |(a, g)| Operator::Join(a, g)),
         map(mv_expand_query, |e| Operator::MvExpand(e)),
