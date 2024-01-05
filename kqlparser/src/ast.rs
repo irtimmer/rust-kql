@@ -6,6 +6,7 @@ pub struct Query {
 
 #[derive(Debug, PartialEq)]
 pub enum Source {
+    Datatable(Vec<(String, Type)>, Vec<Expr>),
     Externaldata(Vec<(String, Type)>, Vec<String>),
     Reference(String)
 }

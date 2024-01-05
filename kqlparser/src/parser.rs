@@ -65,6 +65,14 @@ fn parse_type(i: &[u8]) -> IResult<&[u8], Type> {
     ))(i)
 }
 
+fn parse_type_mapping(i: &[u8]) -> IResult<&[u8], Vec<(String, Type)>> {
+    separated_list1(tag(","), separated_pair(
+        delimited(multispace0, map(take_identifier, |i| FromStr::from_str(str::from_utf8(i).unwrap()).unwrap()), multispace0),
+        tag(":"),
+        delimited(multispace0, parse_type, multispace0)
+    ))(i)
+}
+
 fn take_identifier(i: &[u8]) -> IResult<&[u8], &[u8]> {
     let (input, identifier) = take_while1(is_kql_identifier)(i)?;
 
@@ -185,6 +193,14 @@ pub fn parse_expr(i: &[u8]) -> IResult<&[u8], Expr> {
     parse_or(i)
 }
 
+fn datatable_query(i: &[u8]) -> IResult<&[u8], (Vec<(String, Type)>, Vec<Expr>)> {
+    preceded(terminated(tag_no_case("datatable"), multispace1), separated_pair(
+        delimited(tag("("), parse_type_mapping, tag(")")),
+        multispace0,
+        delimited(tag("["), separated_list1(tag(","), delimited(multispace0, parse_expr, multispace0)), tag("]"))
+    ))(i)
+}
+
 fn extend_query(i: &[u8]) -> IResult<&[u8], Vec<(Option<String>, Expr)>> {
     map(
         tuple((
@@ -204,11 +220,7 @@ fn extend_query(i: &[u8]) -> IResult<&[u8], Vec<(Option<String>, Expr)>> {
 
 fn externaldata_query(i: &[u8]) -> IResult<&[u8], (Vec<(String, Type)>, Vec<String>)> {
     preceded(tuple((tag_no_case("externaldata"), multispace1)), separated_pair(
-        delimited(tag("("), map(separated_list1(tag(","), separated_pair(
-            delimited(multispace0, parse_string, multispace0),
-            tag(":"),
-            delimited(multispace0, parse_type, multispace0)
-        )), |x| x.into_iter().collect()), tag(")")),
+        delimited(tag("("), parse_type_mapping, tag(")")),
         multispace0,
         delimited(tag("["), separated_list1(tag(","), delimited(multispace0, parse_string, multispace0)), tag("]"))
     ))(i)
@@ -334,6 +346,7 @@ fn parse_operator(i: &[u8]) -> IResult<&[u8], Operator> {
 
 fn parse_source(i: &[u8]) -> IResult<&[u8], Source> {
     alt((
+        map(datatable_query, |(a, g)| Source::Datatable(a, g)),
         map(externaldata_query, |(t, c)| Source::Externaldata(t, c)),
         map(take_while1(is_kql_identifier), |e| Source::Reference(FromStr::from_str(str::from_utf8(e).unwrap()).unwrap()))
     ))(i)
