@@ -33,7 +33,7 @@ fn parse_type(i: &str) -> IResult<&str, Type> {
 
 fn parse_type_mapping(i: &str) -> IResult<&str, Vec<(String, Type)>> {
     separated_list1(tag(","), separated_pair(
-        trim(map(take_identifier, |i| i.to_string())),
+        trim(parse_identifier),
         tag(":"),
         trim(parse_type)
     ))(i)
@@ -47,6 +47,10 @@ fn take_identifier(i: &str) -> IResult<&str, &str> {
         return Err(nom::Err::Error(nom::error::Error::new(i, nom::error::ErrorKind::Tag)));
     }
     Ok((input, identifier))
+}
+
+fn parse_identifier(i: &str) -> IResult<&str, String> {
+    map(take_identifier, |i| i.to_string())(i)
 }
 
 fn parse_string(i: &str) -> IResult<&str, String> {
@@ -71,16 +75,16 @@ fn parse_ident(i: &str) -> IResult<&str, Expr> {
         map(parse_literal, |l| Expr::Literal(l)),
         map(
             separated_pair(
-                take_while1(is_kql_identifier),
+                parse_identifier,
                 multispace0,
                 delimited(tag("("), separated_list0(
                     tag(","),
                     trim(parse_expr),
                 ), tag(")"))
             ),
-            |(n, x)| Expr::Func(n.to_string(), x),
+            |(n, x)| Expr::Func(n, x),
         ),
-        map(take_identifier, |i| Expr::Ident(i.to_string())),
+        map(parse_identifier, |i| Expr::Ident(i)),
     ))(i)
 }
 
@@ -159,10 +163,7 @@ fn datatable_query(i: &str) -> IResult<&str, (Vec<(String, Type)>, Vec<Expr>)> {
 fn extend_query(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     preceded(terminated(tag_no_case("extend"), multispace1), separated_list0(
         tuple((multispace0, tag(","), multispace0)),
-        map(
-            separated_pair(take_while1(is_kql_identifier), trim(tag("=")), parse_expr),
-            |(n, e)| (Some(n.to_string()), e)
-        ),
+        map(separated_pair(parse_identifier, trim(tag("=")), parse_expr), |(n, e)| (Some(n), e)),
     ))(i)
 }
 
@@ -178,25 +179,19 @@ fn join_query(i: &str) -> IResult<&str, (Query, Vec<String>)> {
     preceded(terminated(tag_no_case("join"), multispace1), separated_pair(
         delimited(tag("("), parse_query, tag(")")),
         delimited(multispace1, tag("on"), multispace1),
-        separated_list0(
-            tag(","),
-            map(trim(take_while1(is_kql_identifier)), |e: &str| e.to_string()),
-        )
+        separated_list0(tag(","), trim(parse_identifier))
     ))(i)
 }
 
 fn mv_expand_query(i: &str) -> IResult<&str, String> {
-    preceded(terminated(tag_no_case("mv-expand"), multispace1), map(take_identifier, |g| g.to_string()))(i)
+    preceded(terminated(tag_no_case("mv-expand"), multispace1), parse_identifier)(i)
 }
 
 fn project_query(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     preceded(terminated(tag_no_case("project"), multispace1), separated_list0(
         tag(","),
         trim(alt((
-            map(
-                separated_pair(take_while1(is_kql_identifier), trim(tag("=")), parse_expr),
-                |(n, e)| (Some(n.to_string()), e)
-            ),
+            map(separated_pair(parse_identifier, trim(tag("=")), parse_expr), |(n, e)| (Some(n), e)),
             map(parse_expr, |e| (None, e))
         ))),
     ))(i)
@@ -219,7 +214,7 @@ fn summarize_query(i: &str) -> IResult<&str, (Vec<Expr>, Vec<Expr>)> {
 fn sort_query(i: &str) -> IResult<&str, Vec<String>> {
     preceded(tuple((tag_no_case("sort"), multispace1, tag_no_case("by"))), separated_list1(
         tag(","),
-        trim(map(take_while1(is_kql_identifier), |e: &str| e.to_string()))
+        trim(parse_identifier)
     ))(i)
 }
 
@@ -247,7 +242,7 @@ fn parse_source(i: &str) -> IResult<&str, Source> {
     alt((
         map(datatable_query, |(a, g)| Source::Datatable(a, g)),
         map(externaldata_query, |(t, c)| Source::Externaldata(t, c)),
-        map(take_while1(is_kql_identifier), |e: &str| Source::Reference(e.to_string()))
+        map(parse_identifier, |e| Source::Reference(e))
     ))(i)
 }
 
