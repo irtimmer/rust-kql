@@ -31,6 +31,7 @@ pub enum Operator {
     Project(Vec<(Option<String>, Expr)>),
     ProjectAway(Vec<String>),
     ProjectKeep(Vec<String>),
+    ProjectRename(Vec<(String, String)>),
     Summarize(Vec<Expr>, Vec<Expr>),
     Sort(Vec<String>),
     Take(u32),

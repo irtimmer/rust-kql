@@ -278,6 +278,13 @@ fn project_keep_query(i: &str) -> IResult<&str, Vec<String>> {
     ))(i)
 }
 
+fn project_rename_query(i: &str) -> IResult<&str, Vec<(String, String)>> {
+    preceded(terminated(tag_no_case("project-rename"), multispace1), separated_list1(
+        tag(","),
+        separated_pair(trim(parse_identifier), tag("="), trim(parse_identifier))
+    ))(i)
+}
+
 fn where_query(i: &str) -> IResult<&str, Expr> {
     preceded(terminated(tag_no_case("where"), multispace1), parse_expr)(i)
 }
@@ -322,7 +329,8 @@ fn parse_operator(i: &str) -> IResult<&str, Operator> {
         alt((
             map(project_query, |p| Operator::Project(p)),
             map(project_away_query, |p| Operator::ProjectAway(p)),
-            map(project_keep_query, |p| Operator::ProjectKeep(p))
+            map(project_keep_query, |p| Operator::ProjectKeep(p)),
+            map(project_rename_query, |p| Operator::ProjectRename(p))
         )),
         map(summarize_query, |(a, g)| Operator::Summarize(a, g)),
         map(sort_query, |o| Operator::Sort(o)),
