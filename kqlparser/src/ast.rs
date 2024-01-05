@@ -21,6 +21,7 @@ pub enum Operator {
     Consume(Options),
     Count,
     Distinct(Vec<String>),
+    Evaluate(Options, String, Vec<Expr>),
     Extend(Vec<(Option<String>, Expr)>),
     Join(Query, Vec<String>),
     MvExpand(String),

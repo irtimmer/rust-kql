@@ -190,6 +190,14 @@ fn distinct_query(i: &str) -> IResult<&str, Vec<String>> {
     ))(i)
 }
 
+fn evaluate_query(i: &str) -> IResult<&str, (Options, String, Vec<Expr>)> {
+    preceded(terminated(tag_no_case("evaluate"), multispace1), tuple((
+        terminated(parse_options, multispace1),
+        terminated(parse_identifier, multispace0),
+        delimited(tag("("), separated_list0(tag(","), trim(parse_expr)), tag(")"))
+    )))(i)
+}
+
 fn extend_query(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     preceded(terminated(tag_no_case("extend"), multispace1), separated_list0(
         tuple((multispace0, tag(","), multispace0)),
@@ -261,6 +269,7 @@ fn parse_operator(i: &str) -> IResult<&str, Operator> {
         map(consume_query, |o| Operator::Consume(o)),
         map(count_query, |_| Operator::Count),
         map(distinct_query, |c| Operator::Distinct(c)),
+        map(evaluate_query, |(o, n, x)| Operator::Evaluate(o, n, x)),
         map(extend_query, |e| Operator::Extend(e)),
         map(join_query, |(a, g)| Operator::Join(a, g)),
         map(mv_expand_query, |e| Operator::MvExpand(e)),
