@@ -5,10 +5,10 @@ use nom::bytes::complete::{tag, tag_no_case, take_until, take_while1};
 use nom::character::complete::{digit1, multispace0, multispace1};
 use nom::combinator::{map, opt};
 use nom::multi::{many0, separated_list0, separated_list1, fold_many0};
-use nom::sequence::{tuple, preceded, separated_pair, terminated};
+use nom::sequence::{tuple, preceded, delimited, separated_pair, terminated};
 use nom::IResult;
 
-use super::ast::{Expr, Operator, Query, Source, Value};
+use super::ast::{Expr, Operator, Query, Source, Type, Value};
 use super::is_kql_identifier;
 
 enum AddsubOperator {
@@ -57,6 +57,14 @@ fn parse_muldiv_op(i: &[u8]) -> IResult<&[u8], MuldivOperator> {
     ))(i)
 }
 
+fn parse_type(i: &[u8]) -> IResult<&[u8], Type> {
+    alt((
+        map(tag("string"), |_| Type::String),
+        map(tag("bool"), |_| Type::Bool),
+        map(tag("int"), |_| Type::Int),
+    ))(i)
+}
+
 fn take_identifier(i: &[u8]) -> IResult<&[u8], &[u8]> {
     let (input, identifier) = take_while1(is_kql_identifier)(i)?;
 
@@ -65,6 +73,23 @@ fn take_identifier(i: &[u8]) -> IResult<&[u8], &[u8]> {
         return Err(nom::Err::Error(nom::error::Error::new(i, nom::error::ErrorKind::Tag)));
     }
     Ok((input, identifier))
+}
+
+fn parse_string(i: &[u8]) -> IResult<&[u8], String> {
+    alt((
+        map(
+            tuple((tag("'"), take_until("'"), tag("'"))),
+            |(_, s, _)| {
+                FromStr::from_str(str::from_utf8(s).unwrap()).unwrap()
+            },
+        ),
+        map(
+            tuple((tag("\""), take_until("\""), tag("\""))),
+            |(_, s, _)| {
+                FromStr::from_str(str::from_utf8(s).unwrap()).unwrap()
+            },
+        ),
+    ))(i)
 }
 
 fn parse_ident(i: &[u8]) -> IResult<&[u8], Expr> {
@@ -77,19 +102,7 @@ fn parse_ident(i: &[u8]) -> IResult<&[u8], Expr> {
                 FromStr::from_str(str::from_utf8(x).unwrap()).unwrap(),
             ))
         }),
-        map(tuple((tag("'"), take_until("'"), tag("'"))), |(_, s, _)| {
-            Expr::Value(Value::String(
-                FromStr::from_str(str::from_utf8(s).unwrap()).unwrap(),
-            ))
-        }),
-        map(
-            tuple((tag("\""), take_until("\""), tag("\""))),
-            |(_, s, _)| {
-                Expr::Value(Value::String(
-                    FromStr::from_str(str::from_utf8(s).unwrap()).unwrap(),
-                ))
-            },
-        ),
+        map(parse_string, |s| Expr::Value(Value::String(s))),
         map(
             tuple((
                 take_while1(is_kql_identifier),
@@ -187,6 +200,18 @@ fn extend_query(i: &[u8]) -> IResult<&[u8], Vec<(Option<String>, Expr)>> {
         )),
         |(_, _, x)| x
     )(i)
+}
+
+fn externaldata_query(i: &[u8]) -> IResult<&[u8], (Vec<(String, Type)>, Vec<String>)> {
+    preceded(tuple((tag_no_case("externaldata"), multispace1)), separated_pair(
+        delimited(tag("("), map(separated_list1(tag(","), separated_pair(
+            delimited(multispace0, parse_string, multispace0),
+            tag(":"),
+            delimited(multispace0, parse_type, multispace0)
+        )), |x| x.into_iter().collect()), tag(")")),
+        multispace0,
+        delimited(tag("["), separated_list1(tag(","), delimited(multispace0, parse_string, multispace0)), tag("]"))
+    ))(i)
 }
 
 fn join_query(i: &[u8]) -> IResult<&[u8], (Query, Vec<String>)> {
@@ -308,7 +333,10 @@ fn parse_operator(i: &[u8]) -> IResult<&[u8], Operator> {
 }
 
 fn parse_source(i: &[u8]) -> IResult<&[u8], Source> {
-    map(take_while1(is_kql_identifier), |e| Source::Reference(FromStr::from_str(str::from_utf8(e).unwrap()).unwrap()))(i)
+    alt((
+        map(externaldata_query, |(t, c)| Source::Externaldata(t, c)),
+        map(take_while1(is_kql_identifier), |e| Source::Reference(FromStr::from_str(str::from_utf8(e).unwrap()).unwrap()))
+    ))(i)
 }
 
 pub fn parse_query(i: &[u8]) -> IResult<&[u8], Query> {

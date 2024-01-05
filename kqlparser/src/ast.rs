@@ -6,6 +6,7 @@ pub struct Query {
 
 #[derive(Debug, PartialEq)]
 pub enum Source {
+    Externaldata(Vec<(String, Type)>, Vec<String>),
     Reference(String)
 }
 
@@ -39,6 +40,13 @@ pub enum Expr {
     LessOrEqual(Box<Expr>, Box<Expr>),
     GreaterOrEqual(Box<Expr>, Box<Expr>),
     Func(String, Vec<Expr>)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Type {
+    String,
+    Bool,
+    Int
 }
 
 #[derive(Debug, Clone, PartialEq)]
