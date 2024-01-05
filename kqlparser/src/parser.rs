@@ -307,6 +307,16 @@ fn sample_distinct_query(i: &str) -> IResult<&str, (u32, String)> {
     )(i)
 }
 
+fn serialize_query(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
+    preceded(terminated(tag_no_case("serialize"), multispace1), separated_list0(
+        tag(","),
+        trim(map(
+            separated_pair(parse_identifier, trim(tag("=")), parse_expr),
+            |(n, e)| (Some(n), e)
+        )),
+    ))(i)
+}
+
 fn summarize_query(i: &str) -> IResult<&str, (Vec<Expr>, Vec<Expr>)> {
     preceded(terminated(tag_no_case("summarize"), multispace1), pair(
         separated_list0(tag(","), trim(parse_expr)),
@@ -354,6 +364,7 @@ fn parse_operator(i: &str) -> IResult<&str, Operator> {
             map(sample_query, |s| Operator::Sample(s)),
             map(sample_distinct_query, |(s, c)| Operator::SampleDistinct(s, c))
         )),
+        map(serialize_query, |e| Operator::Serialize(e)),
         map(summarize_query, |(a, g)| Operator::Summarize(a, g)),
         map(sort_query, |o| Operator::Sort(o)),
         map(take_query, |t| Operator::Take(t)),
