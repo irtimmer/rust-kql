@@ -224,6 +224,10 @@ fn facet_query(i: &str) -> IResult<&str, (Vec<String>, Vec<Operator>)> {
     ))(i)
 }
 
+fn getschema_query(i: &str) -> IResult<&str, ()> {
+    map(terminated(tag_no_case("getschema"), multispace1), |_| ())(i)
+}
+
 fn join_query(i: &str) -> IResult<&str, (Options, Query, Vec<String>)> {
     preceded(terminated(tag_no_case("join"), multispace1), tuple((
         terminated(parse_options, multispace0),
@@ -286,6 +290,7 @@ fn parse_operator(i: &str) -> IResult<&str, Operator> {
         map(evaluate_query, |(o, n, x)| Operator::Evaluate(o, n, x)),
         map(extend_query, |e| Operator::Extend(e)),
         map(facet_query, |(a, g)| Operator::Facet(a, g)),
+        map(getschema_query, |_| Operator::Getschema),
         map(join_query, |(o, a, g)| Operator::Join(o, a, g)),
         map(mv_expand_query, |e| Operator::MvExpand(e)),
         map(project_query, |p| Operator::Project(p)),
