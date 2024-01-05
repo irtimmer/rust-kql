@@ -26,7 +26,7 @@ pub enum Operator {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Ident(String),
-    Value(Value),
+    Literal(Literal),
     Equals(Box<Expr>, Box<Expr>),
     NotEquals(Box<Expr>, Box<Expr>),
     And(Box<Expr>, Box<Expr>),
@@ -51,7 +51,7 @@ pub enum Type {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Value {
+pub enum Literal {
     None,
     String(String),
     Bool(bool),

@@ -8,7 +8,7 @@ use nom::multi::{many0, separated_list0, separated_list1, fold_many0};
 use nom::sequence::{tuple, preceded, delimited, separated_pair, terminated};
 use nom::IResult;
 
-use super::ast::{Expr, Operator, Query, Source, Type, Value};
+use super::ast::{Expr, Literal, Operator, Query, Source, Type};
 use super::is_kql_identifier;
 
 enum AddsubOperator {
@@ -102,15 +102,15 @@ fn parse_string(i: &[u8]) -> IResult<&[u8], String> {
 
 fn parse_ident(i: &[u8]) -> IResult<&[u8], Expr> {
     alt((
-        map(tag("true"), |_| Expr::Value(Value::Bool(true))),
-        map(tag("false"), |_| Expr::Value(Value::Bool(false))),
-        map(tag("None"), |_| Expr::Value(Value::None)),
+        map(tag("true"), |_| Expr::Literal(Literal::Bool(true))),
+        map(tag("false"), |_| Expr::Literal(Literal::Bool(false))),
+        map(tag("None"), |_| Expr::Literal(Literal::None)),
         map(digit1, |x| {
-            Expr::Value(Value::Int(
+            Expr::Literal(Literal::Int(
                 FromStr::from_str(str::from_utf8(x).unwrap()).unwrap(),
             ))
         }),
-        map(parse_string, |s| Expr::Value(Value::String(s))),
+        map(parse_string, |s| Expr::Literal(Literal::String(s))),
         map(
             tuple((
                 take_while1(is_kql_identifier),

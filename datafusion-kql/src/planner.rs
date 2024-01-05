@@ -11,7 +11,7 @@ use datafusion_expr::{AggregateUDF, Expr, Literal, ScalarUDF, TableSource};
 
 use itertools::Itertools;
 
-use kqlparser::ast::{Expr as KqlExpr, Operator, Query, Value, Source, Type};
+use kqlparser::ast::{Expr as KqlExpr, Operator, Query, Literal as KqlLiteral, Source, Type};
 
 use std::collections::HashMap;
 use std::iter;
@@ -62,7 +62,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
             KqlExpr::Greater(x, y) => self.ast_to_expr(ctx, &x)?.gt(self.ast_to_expr(ctx, &y)?),
             KqlExpr::LessOrEqual(x, y) => self.ast_to_expr(ctx, &x)?.lt_eq(self.ast_to_expr(ctx, &y)?),
             KqlExpr::GreaterOrEqual(x, y) => self.ast_to_expr(ctx, &x)?.gt_eq(self.ast_to_expr(ctx, &y)?),
-            KqlExpr::Value(v) => value_to_expr(v),
+            KqlExpr::Literal(v) => literal_to_expr(v),
             KqlExpr::Ident(x) => col(x.as_str()),
             KqlExpr::Func(x, y) => self.func_to_expr(ctx, x.as_str(), y)?,
         })
@@ -130,11 +130,11 @@ fn type_to_datatype(t: &Type) -> DataType {
     }
 }
 
-fn value_to_expr(val: &Value) -> Expr {
+fn literal_to_expr(val: &KqlLiteral) -> Expr {
     match val {
-        Value::Int(x) => x.lit(),
-        Value::String(x) => x.lit(),
-        Value::Bool(x) => x.lit(),
+        KqlLiteral::Int(x) => x.lit(),
+        KqlLiteral::String(x) => x.lit(),
+        KqlLiteral::Bool(x) => x.lit(),
         _ => {
             panic!("Not supported")
         }
