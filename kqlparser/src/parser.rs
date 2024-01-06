@@ -3,7 +3,7 @@ use std::str::{self, FromStr};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, tag_no_case, take_while1, escaped, is_a};
 use nom::character::complete::{digit1, multispace0, multispace1, none_of, one_of};
-use nom::combinator::{map, opt};
+use nom::combinator::{map, opt, recognize};
 use nom::error::ParseError;
 use nom::multi::{many0, separated_list0, separated_list1, fold_many0};
 use nom::sequence::{tuple, preceded, delimited, separated_pair, terminated, pair};
@@ -68,8 +68,18 @@ fn parse_string(i: &str) -> IResult<&str, String> {
     )), |s| s.to_string())(i)
 }
 
+fn parse_bool(i: &str) -> IResult<&str, Option<bool>> {
+    alt((
+        map(tag_no_case("true"), |_| Some(true)),
+        map(tag_no_case("false"), |_| Some(false)),
+        map(recognize(pair(opt(tag("-")), digit1)), |x: &str| Some(x.parse::<i32>().unwrap() != 0)),
+        map(tag("null"), |_| None)
+    ))(i)
+}
+
 fn parse_literal(i: &str) -> IResult<&str, Literal> {
     alt((
+        map(preceded(tag("bool"), delimited(tag("("), trim(parse_bool), tag(")"))), |x| Literal::Bool(x)),
         map(tag("true"), |_| Literal::Bool(Some(true))),
         map(tag("false"), |_| Literal::Bool(Some(false))),
         map(digit1, |x| Literal::Int(Some(FromStr::from_str(x).unwrap()))),
