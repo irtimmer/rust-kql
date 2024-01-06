@@ -3,20 +3,22 @@ use std::str::{self, FromStr};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, tag_no_case, take_while1, escaped, is_a};
 use nom::character::complete::{digit1, multispace0, multispace1, none_of, one_of, hex_digit1};
+use nom::character::streaming::{u64, i64};
 use nom::combinator::{map, opt, recognize};
 use nom::multi::{many0, separated_list0, separated_list1, fold_many0};
 use nom::sequence::{tuple, preceded, delimited, separated_pair, terminated, pair};
 use nom::IResult;
 
 use super::ast::{Expr, Literal, Operator, Options, Query, Source, Type};
-use super::{is_kql_identifier, trim};
+use super::{dec_to_i64, decimal, is_kql_identifier, trim};
 
 fn parse_type(i: &str) -> IResult<&str, Type> {
     alt((
-        map(tag("string"), |_| Type::String),
         map(tag("bool"), |_| Type::Bool),
         map(tag("int"), |_| Type::Int),
-        map(tag("long"), |_| Type::Long)
+        map(tag("long"), |_| Type::Long),
+        map(tag("string"), |_| Type::String),
+        map(tag("timespan"), |_| Type::Timespan),
     ))(i)
 }
 
@@ -82,14 +84,43 @@ fn parse_long(i: &str) -> IResult<&str, Option<i64>> {
     ))(i)
 }
 
+fn parse_timespan(i: &str) -> IResult<&str, Option<i64>> {
+    alt((
+        map(terminated(decimal, pair(multispace0, alt((tag("days"), tag("day"), tag("d"))))), |x| Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60 * 24))),
+        map(terminated(decimal, pair(multispace0, alt((tag("hours"), tag("hour"), tag("h"))))), |x| Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60))),
+        map(terminated(decimal, pair(multispace0, alt((tag("minutes"), tag("minute"), tag("m"))))), |x| Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60))),
+        map(terminated(decimal, pair(multispace0, alt((tag("seconds"), tag("second"), tag("s"))))), |x| Some(dec_to_i64(x, 1000 * 1000 * 1000))),
+        map(terminated(decimal, pair(multispace0, alt((tag("milliseconds"), tag("millisecond"), tag("milli"), tag("ms"))))), |x| Some(dec_to_i64(x, 1000 * 1000))),
+        map(terminated(decimal, pair(multispace0, alt((tag("microseconds"), tag("microsecond"), tag("micro"))))), |x| Some(dec_to_i64(x, 1000))),
+        map(terminated(decimal, pair(multispace0, alt((tag("ticks"), tag("tick"))))), |x| Some(dec_to_i64(x, 100))),
+        map(
+            tuple((separated_pair(i64, tag("."), separated_pair(u64, tag(":"), u64)), opt(preceded(tag(":"), decimal)))),
+            |((d, (h, m)), s)| Some(((d * 24 + h as i64) * 60 + m as i64) * (1000 * 1000 * 1000 * 60) + s.map(|x| dec_to_i64(x, 1000 * 1000 * 1000)).unwrap_or(0) as i64)
+        ),
+        map(
+            tuple((separated_pair(u64, tag(":"), u64), opt(preceded(tag(":"), decimal)))),
+            |((h, m), s)| Some((h as i64 * 60 + m as i64) * (1000 * 1000 * 1000 * 60) + s.map(|x| dec_to_i64(x, 1000 * 1000 * 1000)).unwrap_or(0) as i64)
+        ),
+        map(tag("null"), |_| None)
+    ))(i)
+}
+
 fn parse_literal(i: &str) -> IResult<&str, Literal> {
     alt((
         map(preceded(tag("bool"), delimited(tag("("), trim(parse_bool), tag(")"))), |x| Literal::Bool(x)),
         map(preceded(tag("int"), delimited(tag("("), trim(parse_int), tag(")"))), |x| Literal::Int(x)),
         map(preceded(tag("long"), delimited(tag("("), trim(parse_long), tag(")"))), |x| Literal::Long(x)),
+        map(preceded(alt((tag("timespan"), tag("time"))), delimited(tag("("), trim(parse_timespan), tag(")"))), |x| Literal::Timespan(x)),
         map(tag("true"), |_| Literal::Bool(Some(true))),
         map(tag("false"), |_| Literal::Bool(Some(false))),
         map(preceded(tag_no_case("0x"), hex_digit1), |x| Literal::Long(Some(i64::from_str_radix(x, 16).unwrap()))),
+        map(terminated(decimal, alt((tag("days"), tag("day"), tag("d")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60 * 24)))),
+        map(terminated(decimal, alt((tag("hours"), tag("hour"), tag("h")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60)))),
+        map(terminated(decimal, alt((tag("minutes"), tag("minute"), tag("m")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60)))),
+        map(terminated(decimal, alt((tag("seconds"), tag("second"), tag("s")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000)))),
+        map(terminated(decimal, alt((tag("milliseconds"), tag("millisecond"), tag("milli"), tag("ms")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000 * 1000)))),
+        map(terminated(decimal, alt((tag("microseconds"), tag("microsecond"), tag("micro")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000)))),
+        map(terminated(decimal, alt((tag("ticks"), tag("tick")))), |x| Literal::Timespan(Some(dec_to_i64(x, 100)))),
         map(digit1, |x| Literal::Long(Some(FromStr::from_str(x).unwrap()))),
         map(parse_string, |s| Literal::String(s)),
     ))(i)

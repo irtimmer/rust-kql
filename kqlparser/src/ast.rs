@@ -66,7 +66,8 @@ pub enum Type {
     Bool,
     Int,
     Long,
-    String
+    String,
+    Timespan
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -74,5 +75,6 @@ pub enum Literal {
     Bool(Option<bool>),
     Int(Option<i32>),
     Long(Option<i64>),
-    String(String)
+    String(String),
+    Timespan(Option<i64>)
 }
