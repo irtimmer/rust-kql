@@ -70,10 +70,9 @@ fn parse_string(i: &str) -> IResult<&str, String> {
 
 fn parse_literal(i: &str) -> IResult<&str, Literal> {
     alt((
-        map(tag("true"), |_| Literal::Bool(true)),
-        map(tag("false"), |_| Literal::Bool(false)),
-        map(tag("None"), |_| Literal::None),
-        map(digit1, |x| Literal::Int(FromStr::from_str(x).unwrap())),
+        map(tag("true"), |_| Literal::Bool(Some(true))),
+        map(tag("false"), |_| Literal::Bool(Some(false))),
+        map(digit1, |x| Literal::Int(Some(FromStr::from_str(x).unwrap()))),
         map(parse_string, |s| Literal::String(s)),
     ))(i)
 }

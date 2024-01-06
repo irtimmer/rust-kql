@@ -70,8 +70,7 @@ pub enum Type {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
-    None,
-    String(String),
-    Bool(bool),
-    Int(u64)
+    Bool(Option<bool>),
+    Int(Option<i32>),
+    String(String)
 }

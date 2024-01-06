@@ -1,6 +1,6 @@
 use arrow_schema::DataType;
 
-use datafusion_common::{TableReference, JoinType, Column, DFSchema, DFField};
+use datafusion_common::{TableReference, JoinType, Column, DFSchema, DFField, ScalarValue};
 use datafusion_common::{DataFusionError, Result};
 
 use datafusion_expr::{aggregate_function, Values};
@@ -124,20 +124,18 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
 
 fn type_to_datatype(t: &Type) -> DataType {
     match t {
-        Type::String => DataType::Utf8,
         Type::Bool => DataType::Boolean,
-        Type::Int => DataType::UInt64,
+        Type::Int => DataType::Int32,
+        Type::String => DataType::Utf8
     }
 }
 
 fn literal_to_expr(val: &KqlLiteral) -> Expr {
     match val {
-        KqlLiteral::Int(x) => x.lit(),
-        KqlLiteral::String(x) => x.lit(),
-        KqlLiteral::Bool(x) => x.lit(),
-        _ => {
-            panic!("Not supported")
-        }
+        KqlLiteral::Bool(x) => ScalarValue::from(*x).lit(),
+        KqlLiteral::Int(x) => ScalarValue::from(*x).lit(),
+        KqlLiteral::String(x) => ScalarValue::from(x.clone()).lit(),
+        _ => panic!("Not supported")
     }
 }
 
