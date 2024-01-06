@@ -4,24 +4,12 @@ use nom::branch::alt;
 use nom::bytes::complete::{tag, tag_no_case, take_while1, escaped, is_a};
 use nom::character::complete::{digit1, multispace0, multispace1, none_of, one_of, hex_digit1};
 use nom::combinator::{map, opt, recognize};
-use nom::error::ParseError;
 use nom::multi::{many0, separated_list0, separated_list1, fold_many0};
 use nom::sequence::{tuple, preceded, delimited, separated_pair, terminated, pair};
-use nom::{IResult, InputLength, Parser, InputTake, InputIter, InputTakeAtPosition, AsChar};
+use nom::IResult;
 
 use super::ast::{Expr, Literal, Operator, Options, Query, Source, Type};
-use super::is_kql_identifier;
-
-pub fn trim<I, O, E, F>(f: F) -> impl FnMut(I) -> IResult<I, O, E>
-where
-    I: Clone + InputLength + InputTake + InputIter,
-    I: InputTakeAtPosition,
-    <I as InputTakeAtPosition>::Item: AsChar + Clone,
-    F: Parser<I, O, E>,
-    E: ParseError<I>,
-{
-    delimited(multispace0, f, multispace0)
-}
+use super::{is_kql_identifier, trim};
 
 fn parse_type(i: &str) -> IResult<&str, Type> {
     alt((
