@@ -63,14 +63,16 @@ pub enum Expr {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
-    String,
     Bool,
-    Int
+    Int,
+    Long,
+    String
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     Bool(Option<bool>),
     Int(Option<i32>),
+    Long(Option<i64>),
     String(String)
 }

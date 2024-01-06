@@ -28,6 +28,7 @@ fn parse_type(i: &str) -> IResult<&str, Type> {
         map(tag("string"), |_| Type::String),
         map(tag("bool"), |_| Type::Bool),
         map(tag("int"), |_| Type::Int),
+        map(tag("long"), |_| Type::Long)
     ))(i)
 }
 
@@ -85,13 +86,23 @@ fn parse_int(i: &str) -> IResult<&str, Option<i32>> {
     ))(i)
 }
 
+fn parse_long(i: &str) -> IResult<&str, Option<i64>> {
+    alt((
+        map(preceded(tag_no_case("0x"), hex_digit1), |x| Some(i64::from_str_radix(x, 16).unwrap())),
+        map(recognize(pair(opt(tag("-")), digit1)), |x: &str| Some(x.parse().unwrap())),
+        map(tag("null"), |_| None)
+    ))(i)
+}
+
 fn parse_literal(i: &str) -> IResult<&str, Literal> {
     alt((
         map(preceded(tag("bool"), delimited(tag("("), trim(parse_bool), tag(")"))), |x| Literal::Bool(x)),
         map(preceded(tag("int"), delimited(tag("("), trim(parse_int), tag(")"))), |x| Literal::Int(x)),
+        map(preceded(tag("long"), delimited(tag("("), trim(parse_long), tag(")"))), |x| Literal::Long(x)),
         map(tag("true"), |_| Literal::Bool(Some(true))),
         map(tag("false"), |_| Literal::Bool(Some(false))),
-        map(digit1, |x| Literal::Int(Some(FromStr::from_str(x).unwrap()))),
+        map(preceded(tag_no_case("0x"), hex_digit1), |x| Literal::Long(Some(i64::from_str_radix(x, 16).unwrap()))),
+        map(digit1, |x| Literal::Long(Some(FromStr::from_str(x).unwrap()))),
         map(parse_string, |s| Literal::String(s)),
     ))(i)
 }

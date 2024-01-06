@@ -126,7 +126,8 @@ fn type_to_datatype(t: &Type) -> DataType {
     match t {
         Type::Bool => DataType::Boolean,
         Type::Int => DataType::Int32,
-        Type::String => DataType::Utf8
+        Type::String => DataType::Utf8,
+        _ => panic!("Not supported")
     }
 }
 
