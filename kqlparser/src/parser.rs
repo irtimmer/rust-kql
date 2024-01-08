@@ -405,6 +405,16 @@ fn take_query(i: &str) -> IResult<&str, u32> {
     )(i)
 }
 
+fn union_query(i: &str) -> IResult<&str, (Options, Vec<Source>)> {
+    preceded(terminated(tag_no_case("union"), multispace1), tuple((
+        terminated(parse_options, multispace0),
+        separated_list1(trim(tag(",")), alt((
+            delimited(tag("("), trim(parse_source), tag(")")),
+            map(parse_identifier, |e| Source::Reference(e))
+        )))
+    )))(i)
+}
+
 fn parse_operator(i: &str) -> IResult<&str, Operator> {
     alt((
         map(as_query, |(o, a)| Operator::As(o, a)),
@@ -432,6 +442,7 @@ fn parse_operator(i: &str) -> IResult<&str, Operator> {
         map(summarize_query, |(a, g)| Operator::Summarize(a, g)),
         map(sort_query, |o| Operator::Sort(o)),
         map(take_query, |t| Operator::Take(t)),
+        map(union_query, |(o, s)| Operator::Union(o, s)),
         map(where_query, |e| Operator::Where(e))
     ))(i)
 }
@@ -442,6 +453,7 @@ fn parse_source(i: &str) -> IResult<&str, Source> {
         map(externaldata_query, |(t, c)| Source::Externaldata(t, c)),
         map(print_query, |e| Source::Print(e)),
         map(range_query, |(c, f, t, s)| Source::Range(c, f, t, s)),
+        map(union_query, |(o, s)| Source::Union(o, s)),
         map(parse_identifier, |e| Source::Reference(e))
     ))(i)
 }

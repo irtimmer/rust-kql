@@ -14,7 +14,8 @@ pub enum Source {
     Externaldata(Vec<(String, Type)>, Vec<String>),
     Print(Vec<(Option<String>, Expr)>),
     Range(String, Expr, Expr, Expr),
-    Reference(String)
+    Reference(String),
+    Union(Options, Vec<Source>)
 }
 
 #[derive(Debug, PartialEq)]
@@ -40,6 +41,7 @@ pub enum Operator {
     Summarize(Vec<Expr>, Vec<Expr>),
     Sort(Vec<String>),
     Take(u32),
+    Union(Options, Vec<Source>),
     Where(Expr)
 }
 
