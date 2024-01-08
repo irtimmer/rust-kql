@@ -344,6 +344,15 @@ fn where_query(i: &str) -> IResult<&str, Expr> {
     preceded(terminated(tag_no_case("where"), multispace1), parse_expr)(i)
 }
 
+fn range_query(i: &str) -> IResult<&str, (String, Expr, Expr, Expr)> {
+    preceded(terminated(tag_no_case("range"), multispace1), tuple((
+        terminated(parse_identifier, multispace1),
+        terminated(preceded(terminated(tag_no_case("from"), multispace1), parse_expr), multispace1),
+        terminated(preceded(terminated(tag_no_case("to"), multispace1), parse_expr), multispace1),
+        preceded(terminated(tag_no_case("step"), multispace1), parse_expr)
+    )))(i)
+}
+
 fn sample_query(i: &str) -> IResult<&str, u32> {
     preceded(
         terminated(tag_no_case("sample"), multispace1),
@@ -432,6 +441,7 @@ fn parse_source(i: &str) -> IResult<&str, Source> {
         map(datatable_query, |(a, g)| Source::Datatable(a, g)),
         map(externaldata_query, |(t, c)| Source::Externaldata(t, c)),
         map(print_query, |e| Source::Print(e)),
+        map(range_query, |(c, f, t, s)| Source::Range(c, f, t, s)),
         map(parse_identifier, |e| Source::Reference(e))
     ))(i)
 }
