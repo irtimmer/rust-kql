@@ -12,6 +12,7 @@ pub struct Query {
 pub enum Source {
     Datatable(Vec<(String, Type)>, Vec<Expr>),
     Externaldata(Vec<(String, Type)>, Vec<String>),
+    Print(Vec<(Option<String>, Expr)>),
     Reference(String)
 }
 

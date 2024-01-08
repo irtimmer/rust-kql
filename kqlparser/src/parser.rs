@@ -302,6 +302,13 @@ fn mv_expand_query(i: &str) -> IResult<&str, String> {
     preceded(terminated(tag_no_case("mv-expand"), multispace1), parse_identifier)(i)
 }
 
+fn print_query(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
+    preceded(terminated(tag_no_case("print"), multispace0), separated_list0(
+        trim(tag(",")),
+        map(separated_pair(parse_identifier, trim(tag("=")), parse_expr), |(n, e)| (Some(n), e)),
+    ))(i)
+}
+
 fn project_query(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     preceded(terminated(tag_no_case("project"), multispace1), separated_list0(
         tag(","),
@@ -424,6 +431,7 @@ fn parse_source(i: &str) -> IResult<&str, Source> {
     alt((
         map(datatable_query, |(a, g)| Source::Datatable(a, g)),
         map(externaldata_query, |(t, c)| Source::Externaldata(t, c)),
+        map(print_query, |e| Source::Print(e)),
         map(parse_identifier, |e| Source::Reference(e))
     ))(i)
 }
