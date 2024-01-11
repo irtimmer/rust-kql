@@ -31,6 +31,7 @@ pub enum Operator {
     Join(Options, Query, Vec<String>),
     Lookup(Options, Query, Vec<String>),
     MvExpand(String),
+    Parse(Options, Expr, Vec<PatternToken>),
     Project(Vec<(Option<String>, Expr)>),
     ProjectAway(Vec<String>),
     ProjectKeep(Vec<String>),
@@ -81,4 +82,11 @@ pub enum Literal {
     Long(Option<i64>),
     String(String),
     Timespan(Option<i64>)
+}
+
+#[derive(Debug, PartialEq)]
+pub enum PatternToken {
+    Wildcard,
+    String(String),
+    Column(String, Option<Type>),
 }

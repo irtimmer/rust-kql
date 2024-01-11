@@ -5,11 +5,11 @@ use nom::bytes::complete::{tag, tag_no_case, take_while1, escaped, is_a};
 use nom::character::complete::{digit1, multispace0, multispace1, none_of, one_of, hex_digit1};
 use nom::character::streaming::{u64, i64};
 use nom::combinator::{map, opt, recognize};
-use nom::multi::{many0, separated_list0, separated_list1, fold_many0};
+use nom::multi::{many0, separated_list0, separated_list1, fold_many0, many1};
 use nom::sequence::{tuple, preceded, delimited, separated_pair, terminated, pair};
 use nom::IResult;
 
-use super::ast::{Expr, Literal, Operator, Options, Query, Source, Type};
+use super::ast::*;
 use super::{dec_to_i64, decimal, is_kql_identifier, trim};
 
 fn parse_type(i: &str) -> IResult<&str, Type> {
@@ -28,6 +28,18 @@ fn parse_options(i: &str) -> IResult<&str, Options> {
         trim(tag("=")),
         parse_literal
     )), |x| x.into_iter().collect())(i)
+}
+
+fn parse_pattern(i: &str) -> IResult<&str, Vec<PatternToken>> {
+    many1(trim(alt((
+        map(tag("*"), |_| PatternToken::Wildcard),
+        map(parse_string, |s| PatternToken::String(s)),
+        map(parse_identifier, |i| PatternToken::Column(i, None)),
+        map(
+            pair(parse_identifier, opt(preceded(trim(tag(":")), parse_type))),
+            |(n, t)| PatternToken::Column(n, t)
+        )
+    ))))(i)
 }
 
 fn parse_type_mapping(i: &str) -> IResult<&str, Vec<(String, Type)>> {
@@ -302,6 +314,14 @@ fn mv_expand_query(i: &str) -> IResult<&str, String> {
     preceded(terminated(tag_no_case("mv-expand"), multispace1), parse_identifier)(i)
 }
 
+fn parse_op(i: &str) -> IResult<&str, (Options, Expr, Vec<PatternToken>)> {
+    preceded(terminated(tag_no_case("parse"), multispace1), tuple((
+        terminated(parse_options, multispace0),
+        terminated(parse_expr, multispace0),
+        preceded(terminated(tag("with"), multispace1), parse_pattern)
+    )))(i)
+}
+
 fn print_query(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     preceded(terminated(tag_no_case("print"), multispace0), separated_list0(
         trim(tag(",")),
@@ -434,6 +454,7 @@ fn parse_operator(i: &str) -> IResult<&str, Operator> {
             map(project_keep_query, |p| Operator::ProjectKeep(p)),
             map(project_rename_query, |p| Operator::ProjectRename(p))
         )),
+        map(parse_op, |(o, e, p)| Operator::Parse(o, e, p)),
         alt((
             map(sample_query, |s| Operator::Sample(s)),
             map(sample_distinct_query, |(s, c)| Operator::SampleDistinct(s, c))
