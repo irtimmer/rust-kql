@@ -294,6 +294,20 @@ fn find_operator(i: &str) -> IResult<&str, (Options, (Option<Vec<Source>>, Expr)
     )))(i)
 }
 
+fn fork_operator(i: &str) -> IResult<&str, Vec<(Option<String>, Vec<Operator>)>> {
+    preceded(terminated(tag_no_case("fork"), multispace1), separated_list1(
+        tag(","),
+        trim(alt((
+            map(separated_pair(
+                identifier,
+                trim(tag("=")),
+                delimited(tag("("), separated_list1(tag("|"), trim(operator)), tag(")"))
+            ), |(n, e)| (Some(n), e)),
+            map(delimited(tag("("), separated_list1(tag("|"), trim(operator)), tag(")")), |e| (None, e))
+        )))
+    ))(i)
+}
+
 fn getschema_operator(i: &str) -> IResult<&str, ()> {
     map(terminated(tag_no_case("getschema"), multispace1), |_| ())(i)
 }
@@ -454,6 +468,7 @@ fn operator(i: &str) -> IResult<&str, Operator> {
         map(evaluate_operator, |(o, n, x)| Operator::Evaluate(o, n, x)),
         map(extend_operator, |e| Operator::Extend(e)),
         map(facet_operator, |(a, g)| Operator::Facet(a, g)),
+        map(fork_operator, |f| Operator::Fork(f)),
         map(getschema_operator, |_| Operator::Getschema),
         map(join_operator, |(o, a, g)| Operator::Join(o, a, g)),
         map(lookup_operator, |(o, a, g)| Operator::Lookup(o, a, g)),
