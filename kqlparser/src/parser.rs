@@ -34,7 +34,6 @@ fn pattern(i: &str) -> IResult<&str, Vec<PatternToken>> {
     many1(trim(alt((
         map(tag("*"), |_| PatternToken::Wildcard),
         map(string, |s| PatternToken::String(s)),
-        map(identifier, |i| PatternToken::Column(i, None)),
         map(
             pair(identifier, opt(preceded(trim(tag(":")), type_tag))),
             |(n, t)| PatternToken::Column(n, t)
