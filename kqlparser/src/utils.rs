@@ -1,4 +1,4 @@
-use nom::bytes::complete::tag;
+use nom::bytes::complete::{tag, take_while1};
 use nom::character::complete::multispace0;
 use nom::character::streaming::{i64, u64};
 use nom::combinator::{map, opt, consumed};
@@ -16,6 +16,16 @@ pub fn dec_to_i64(dec: Decimal, precision: u64) -> i64 {
 #[inline]
 pub fn is_kql_identifier(chr: char) -> bool {
     chr.is_alphanumeric() || chr == '_'
+}
+
+pub fn take_identifier(i: &str) -> IResult<&str, &str> {
+    let (input, identifier) = take_while1(is_kql_identifier)(i)?;
+
+    // exclude reserved keywords
+    if identifier == "by" {
+        return Err(nom::Err::Error(nom::error::Error::new(i, nom::error::ErrorKind::Tag)));
+    }
+    Ok((input, identifier))
 }
 
 pub fn decimal(i: &str) -> IResult<&str, Decimal> {

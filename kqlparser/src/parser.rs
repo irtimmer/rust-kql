@@ -10,9 +10,9 @@ use nom::sequence::{tuple, preceded, delimited, separated_pair, terminated, pair
 use nom::IResult;
 
 use super::ast::*;
-use super::{dec_to_i64, decimal, is_kql_identifier, trim};
+use super::{dec_to_i64, decimal, is_kql_identifier, take_identifier, trim};
 
-fn parse_type(i: &str) -> IResult<&str, Type> {
+fn type_tag(i: &str) -> IResult<&str, Type> {
     alt((
         map(tag("bool"), |_| Type::Bool),
         map(tag("int"), |_| Type::Int),
@@ -22,56 +22,46 @@ fn parse_type(i: &str) -> IResult<&str, Type> {
     ))(i)
 }
 
-fn parse_options(i: &str) -> IResult<&str, Options> {
+fn options(i: &str) -> IResult<&str, Options> {
     map(separated_list0(multispace1, separated_pair(
-        parse_identifier,
+        identifier,
         trim(tag("=")),
-        parse_literal
+        literal
     )), |x| x.into_iter().collect())(i)
 }
 
-fn parse_pattern(i: &str) -> IResult<&str, Vec<PatternToken>> {
+fn pattern(i: &str) -> IResult<&str, Vec<PatternToken>> {
     many1(trim(alt((
         map(tag("*"), |_| PatternToken::Wildcard),
-        map(parse_string, |s| PatternToken::String(s)),
-        map(parse_identifier, |i| PatternToken::Column(i, None)),
+        map(string, |s| PatternToken::String(s)),
+        map(identifier, |i| PatternToken::Column(i, None)),
         map(
-            pair(parse_identifier, opt(preceded(trim(tag(":")), parse_type))),
+            pair(identifier, opt(preceded(trim(tag(":")), type_tag))),
             |(n, t)| PatternToken::Column(n, t)
         )
     ))))(i)
 }
 
-fn parse_type_mapping(i: &str) -> IResult<&str, Vec<(String, Type)>> {
+fn type_mapping(i: &str) -> IResult<&str, Vec<(String, Type)>> {
     separated_list1(tag(","), separated_pair(
-        trim(parse_identifier),
+        trim(identifier),
         tag(":"),
-        trim(parse_type)
+        trim(type_tag)
     ))(i)
 }
 
-fn take_identifier(i: &str) -> IResult<&str, &str> {
-    let (input, identifier) = take_while1(is_kql_identifier)(i)?;
-
-    // exclude reserved keywords
-    if identifier == "by" {
-        return Err(nom::Err::Error(nom::error::Error::new(i, nom::error::ErrorKind::Tag)));
-    }
-    Ok((input, identifier))
-}
-
-fn parse_identifier(i: &str) -> IResult<&str, String> {
+fn identifier(i: &str) -> IResult<&str, String> {
     map(take_identifier, |i| i.to_string())(i)
 }
 
-fn parse_string(i: &str) -> IResult<&str, String> {
+fn string(i: &str) -> IResult<&str, String> {
     map(alt((
         delimited(tag("\""), alt((escaped(none_of::<&str, _, _>("\\\""), '\\', tag("\"")), tag(""))), tag("\"")),
         delimited(tag("'"), alt((escaped(none_of::<&str, _, _>("\\'"), '\\', tag("'")), tag(""))), tag("'"))
     )), |s| s.to_string())(i)
 }
 
-fn parse_bool(i: &str) -> IResult<&str, Option<bool>> {
+fn boolean(i: &str) -> IResult<&str, Option<bool>> {
     alt((
         map(tag_no_case("true"), |_| Some(true)),
         map(tag_no_case("false"), |_| Some(false)),
@@ -80,7 +70,7 @@ fn parse_bool(i: &str) -> IResult<&str, Option<bool>> {
     ))(i)
 }
 
-fn parse_int(i: &str) -> IResult<&str, Option<i32>> {
+fn integer(i: &str) -> IResult<&str, Option<i32>> {
     alt((
         map(preceded(tag_no_case("0x"), hex_digit1), |x| Some(i32::from_str_radix(x, 16).unwrap())),
         map(recognize(pair(opt(tag("-")), digit1)), |x: &str| Some(x.parse().unwrap())),
@@ -88,7 +78,7 @@ fn parse_int(i: &str) -> IResult<&str, Option<i32>> {
     ))(i)
 }
 
-fn parse_long(i: &str) -> IResult<&str, Option<i64>> {
+fn long(i: &str) -> IResult<&str, Option<i64>> {
     alt((
         map(preceded(tag_no_case("0x"), hex_digit1), |x| Some(i64::from_str_radix(x, 16).unwrap())),
         map(recognize(pair(opt(tag("-")), digit1)), |x: &str| Some(x.parse().unwrap())),
@@ -96,7 +86,7 @@ fn parse_long(i: &str) -> IResult<&str, Option<i64>> {
     ))(i)
 }
 
-fn parse_timespan(i: &str) -> IResult<&str, Option<i64>> {
+fn timespan(i: &str) -> IResult<&str, Option<i64>> {
     alt((
         map(terminated(decimal, pair(multispace0, alt((tag("days"), tag("day"), tag("d"))))), |x| Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60 * 24))),
         map(terminated(decimal, pair(multispace0, alt((tag("hours"), tag("hour"), tag("h"))))), |x| Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60))),
@@ -117,12 +107,12 @@ fn parse_timespan(i: &str) -> IResult<&str, Option<i64>> {
     ))(i)
 }
 
-fn parse_literal(i: &str) -> IResult<&str, Literal> {
+fn literal(i: &str) -> IResult<&str, Literal> {
     alt((
-        map(preceded(tag("bool"), delimited(tag("("), trim(parse_bool), tag(")"))), |x| Literal::Bool(x)),
-        map(preceded(tag("int"), delimited(tag("("), trim(parse_int), tag(")"))), |x| Literal::Int(x)),
-        map(preceded(tag("long"), delimited(tag("("), trim(parse_long), tag(")"))), |x| Literal::Long(x)),
-        map(preceded(alt((tag("timespan"), tag("time"))), delimited(tag("("), trim(parse_timespan), tag(")"))), |x| Literal::Timespan(x)),
+        map(preceded(tag("bool"), delimited(tag("("), trim(boolean), tag(")"))), |x| Literal::Bool(x)),
+        map(preceded(tag("int"), delimited(tag("("), trim(integer), tag(")"))), |x| Literal::Int(x)),
+        map(preceded(tag("long"), delimited(tag("("), trim(long), tag(")"))), |x| Literal::Long(x)),
+        map(preceded(alt((tag("timespan"), tag("time"))), delimited(tag("("), trim(timespan), tag(")"))), |x| Literal::Timespan(x)),
         map(tag("true"), |_| Literal::Bool(Some(true))),
         map(tag("false"), |_| Literal::Bool(Some(false))),
         map(preceded(tag_no_case("0x"), hex_digit1), |x| Literal::Long(Some(i64::from_str_radix(x, 16).unwrap()))),
@@ -134,38 +124,38 @@ fn parse_literal(i: &str) -> IResult<&str, Literal> {
         map(terminated(decimal, alt((tag("microseconds"), tag("microsecond"), tag("micro")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000)))),
         map(terminated(decimal, alt((tag("ticks"), tag("tick")))), |x| Literal::Timespan(Some(dec_to_i64(x, 100)))),
         map(digit1, |x| Literal::Long(Some(FromStr::from_str(x).unwrap()))),
-        map(parse_string, |s| Literal::String(s)),
+        map(string, |s| Literal::String(s)),
     ))(i)
 }
 
-fn parse_ident(i: &str) -> IResult<&str, Expr> {
+fn ident_expr(i: &str) -> IResult<&str, Expr> {
     alt((
-        map(parse_literal, |l| Expr::Literal(l)),
+        map(literal, |l| Expr::Literal(l)),
         map(
             separated_pair(
-                parse_identifier,
+                identifier,
                 multispace0,
                 delimited(tag("("), separated_list0(
                     tag(","),
-                    trim(parse_expr),
+                    trim(expr),
                 ), tag(")"))
             ),
             |(n, x)| Expr::Func(n, x),
         ),
-        map(parse_identifier, |i| Expr::Ident(i)),
+        map(identifier, |i| Expr::Ident(i)),
     ))(i)
 }
 
-fn parse_delim(i: &str) -> IResult<&str, Expr> {
+fn delim_expr(i: &str) -> IResult<&str, Expr> {
     alt((
-        delimited(tag("("), trim(parse_or), tag(")")),
-        parse_ident,
+        delimited(tag("("), trim(or_expr), tag(")")),
+        ident_expr,
     ))(i)
 }
 
-fn parse_muldiv(i: &str) -> IResult<&str, Expr> {
-    let (i, initial) = parse_delim(i)?;
-    fold_many0(pair(trim(one_of("*/%")), parse_delim), move || initial.clone(), |acc, (o, g)| match o {
+fn muldiv_expr(i: &str) -> IResult<&str, Expr> {
+    let (i, initial) = delim_expr(i)?;
+    fold_many0(pair(trim(one_of("*/%")), delim_expr), move || initial.clone(), |acc, (o, g)| match o {
         '*' => Expr::Multiply(Box::new(acc), Box::new(g)),
         '/' => Expr::Divide(Box::new(acc), Box::new(g)),
         '%' => Expr::Modulo(Box::new(acc), Box::new(g)),
@@ -173,18 +163,18 @@ fn parse_muldiv(i: &str) -> IResult<&str, Expr> {
     })(i)
 }
 
-fn parse_addsub(i: &str) -> IResult<&str, Expr> {
-    let (i, initial) = parse_muldiv(i)?;
-    fold_many0(pair(trim(one_of("+-")), parse_muldiv), move || initial.clone(), |acc, (o, g)| match o {
+fn addsub_expr(i: &str) -> IResult<&str, Expr> {
+    let (i, initial) = muldiv_expr(i)?;
+    fold_many0(pair(trim(one_of("+-")), muldiv_expr), move || initial.clone(), |acc, (o, g)| match o {
         '+' => Expr::Add(Box::new(acc), Box::new(g)),
         '-' => Expr::Substract(Box::new(acc), Box::new(g)),
         _ => unreachable!()
     })(i)
 }
 
-fn parse_predicate(i: &str) -> IResult<&str, Expr> {
-    let (i, initial) = parse_addsub(i)?;
-    let (i, e) = fold_many0(pair(trim(is_a("!=<>")), parse_addsub), move || Ok(initial.clone()), |acc, (o, g)| acc.and_then(|acc| Ok(match o {
+fn predicate(i: &str) -> IResult<&str, Expr> {
+    let (i, initial) = addsub_expr(i)?;
+    let (i, e) = fold_many0(pair(trim(is_a("!=<>")), addsub_expr), move || Ok(initial.clone()), |acc, (o, g)| acc.and_then(|acc| Ok(match o {
         "==" => Expr::Equals(Box::new(acc), Box::new(g)),
         "!=" => Expr::NotEquals(Box::new(acc), Box::new(g)),
         "<" => Expr::Less(Box::new(acc), Box::new(g)),
@@ -196,291 +186,291 @@ fn parse_predicate(i: &str) -> IResult<&str, Expr> {
     Ok((i, e?))
 }
 
-fn parse_and(i: &str) -> IResult<&str, Expr> {
+fn and_expr(i: &str) -> IResult<&str, Expr> {
     alt((
         map(
-            separated_pair(parse_delim, trim(tag("and")), parse_or),
+            separated_pair(delim_expr, trim(tag("and")), or_expr),
             |(first, second)| Expr::And(Box::new(first), Box::new(second)),
         ),
-        parse_predicate,
+        predicate,
     ))(i)
 }
 
-fn parse_or(i: &str) -> IResult<&str, Expr> {
+fn or_expr(i: &str) -> IResult<&str, Expr> {
     alt((
         map(
-            separated_pair(parse_and, trim(tag("or")), parse_or),
+            separated_pair(and_expr, trim(tag("or")), or_expr),
             |(first, second)| Expr::Or(Box::new(first), Box::new(second)),
         ),
-        parse_and,
+        and_expr,
     ))(i)
 }
 
-pub fn parse_expr(i: &str) -> IResult<&str, Expr> {
-    parse_or(i)
+pub fn expr(i: &str) -> IResult<&str, Expr> {
+    or_expr(i)
 }
 
-fn as_query(i: &str) -> IResult<&str, (Options, String)> {
+fn as_operator(i: &str) -> IResult<&str, (Options, String)> {
     preceded(terminated(tag_no_case("as"), multispace1), map(
-        pair(opt(terminated(parse_options, multispace1)), parse_identifier),
+        pair(opt(terminated(options, multispace1)), identifier),
         |(o, a)| (o.unwrap_or_default(), a)
     ))(i)
 }
 
-fn consume_query(i: &str) -> IResult<&str, Options> {
-    preceded(terminated(tag_no_case("consume"), multispace1), parse_options)(i)
+fn consume_operator(i: &str) -> IResult<&str, Options> {
+    preceded(terminated(tag_no_case("consume"), multispace1), options)(i)
 }
 
-fn count_query(i: &str) -> IResult<&str, ()> {
+fn count_operator(i: &str) -> IResult<&str, ()> {
     map(terminated(tag_no_case("count"), multispace1), |_| ())(i)
 }
 
-fn datatable_query(i: &str) -> IResult<&str, (Vec<(String, Type)>, Vec<Expr>)> {
+fn datatable_operator(i: &str) -> IResult<&str, (Vec<(String, Type)>, Vec<Expr>)> {
     preceded(terminated(tag_no_case("datatable"), multispace1), separated_pair(
-        delimited(tag("("), parse_type_mapping, tag(")")),
+        delimited(tag("("), type_mapping, tag(")")),
         multispace0,
-        delimited(tag("["), separated_list1(tag(","), trim(parse_expr)), tag("]"))
+        delimited(tag("["), separated_list1(tag(","), trim(expr)), tag("]"))
     ))(i)
 }
 
-fn distinct_query(i: &str) -> IResult<&str, Vec<String>> {
+fn distinct_operator(i: &str) -> IResult<&str, Vec<String>> {
     preceded(terminated(tag_no_case("distinct"), multispace1), separated_list1(
         tag(","),
-        trim(parse_identifier)
+        trim(identifier)
     ))(i)
 }
 
-fn evaluate_query(i: &str) -> IResult<&str, (Options, String, Vec<Expr>)> {
+fn evaluate_operator(i: &str) -> IResult<&str, (Options, String, Vec<Expr>)> {
     preceded(terminated(tag_no_case("evaluate"), multispace1), tuple((
-        terminated(parse_options, multispace1),
-        terminated(parse_identifier, multispace0),
-        delimited(tag("("), separated_list0(tag(","), trim(parse_expr)), tag(")"))
+        terminated(options, multispace1),
+        terminated(identifier, multispace0),
+        delimited(tag("("), separated_list0(tag(","), trim(expr)), tag(")"))
     )))(i)
 }
 
-fn extend_query(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
+fn extend_operator(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     preceded(terminated(tag_no_case("extend"), multispace1), separated_list0(
         tuple((multispace0, tag(","), multispace0)),
-        map(separated_pair(parse_identifier, trim(tag("=")), parse_expr), |(n, e)| (Some(n), e)),
+        map(separated_pair(identifier, trim(tag("=")), expr), |(n, e)| (Some(n), e)),
     ))(i)
 }
 
-fn externaldata_query(i: &str) -> IResult<&str, (Vec<(String, Type)>, Vec<String>)> {
+fn externaldata_operator(i: &str) -> IResult<&str, (Vec<(String, Type)>, Vec<String>)> {
     preceded(terminated(tag_no_case("externaldata"), multispace1), separated_pair(
-        delimited(tag("("), parse_type_mapping, tag(")")),
+        delimited(tag("("), type_mapping, tag(")")),
         multispace0,
-        delimited(tag("["), separated_list1(tag(","), trim(parse_string)), tag("]"))
+        delimited(tag("["), separated_list1(tag(","), trim(string)), tag("]"))
     ))(i)
 }
 
-fn facet_query(i: &str) -> IResult<&str, (Vec<String>, Vec<Operator>)> {
+fn facet_operator(i: &str) -> IResult<&str, (Vec<String>, Vec<Operator>)> {
     preceded(terminated(separated_pair(tag_no_case("facet"), multispace1, tag_no_case("by")), multispace1), pair(
-        separated_list0(tag(","), trim(parse_identifier)),
+        separated_list0(tag(","), trim(identifier)),
         map(opt(preceded(terminated(tag("with"), multispace0), delimited(
             tag("("),
-            separated_list1(tag("|"), trim(parse_operator)),
+            separated_list1(tag("|"), trim(operator)),
             tag(")")
         ))), |o| o.unwrap_or_default())
     ))(i)
 }
 
-fn getschema_query(i: &str) -> IResult<&str, ()> {
+fn getschema_operator(i: &str) -> IResult<&str, ()> {
     map(terminated(tag_no_case("getschema"), multispace1), |_| ())(i)
 }
 
-fn join_query(i: &str) -> IResult<&str, (Options, Query, Vec<String>)> {
+fn join_operator(i: &str) -> IResult<&str, (Options, Query, Vec<String>)> {
     preceded(terminated(tag_no_case("join"), multispace1), tuple((
-        terminated(parse_options, multispace0),
+        terminated(options, multispace0),
         terminated(delimited(tag("("), parse_query, tag(")")), multispace0),
         preceded(
             terminated(tag("on"), multispace1),
-            separated_list0(tag(","), trim(parse_identifier))
+            separated_list0(tag(","), trim(identifier))
         )
     )))(i)
 }
 
-fn lookup_query(i: &str) -> IResult<&str, (Options, Query, Vec<String>)> {
+fn lookup_operator(i: &str) -> IResult<&str, (Options, Query, Vec<String>)> {
     preceded(terminated(tag_no_case("lookup"), multispace1), tuple((
-        terminated(parse_options, multispace0),
+        terminated(options, multispace0),
         terminated(delimited(tag("("), parse_query, tag(")")), multispace0),
         preceded(
             terminated(tag("on"), multispace1),
-            separated_list0(tag(","), trim(parse_identifier))
+            separated_list0(tag(","), trim(identifier))
         )
     )))(i)
 }
 
-fn mv_expand_query(i: &str) -> IResult<&str, String> {
-    preceded(terminated(tag_no_case("mv-expand"), multispace1), parse_identifier)(i)
+fn mv_expand_operator(i: &str) -> IResult<&str, String> {
+    preceded(terminated(tag_no_case("mv-expand"), multispace1), identifier)(i)
 }
 
-fn parse_op(i: &str) -> IResult<&str, (Options, Expr, Vec<PatternToken>)> {
+fn parse_operator(i: &str) -> IResult<&str, (Options, Expr, Vec<PatternToken>)> {
     preceded(terminated(tag_no_case("parse"), multispace1), tuple((
-        terminated(parse_options, multispace0),
-        terminated(parse_expr, multispace0),
-        preceded(terminated(tag("with"), multispace1), parse_pattern)
+        terminated(options, multispace0),
+        terminated(expr, multispace0),
+        preceded(terminated(tag("with"), multispace1), pattern)
     )))(i)
 }
 
-fn print_query(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
+fn print_operator(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     preceded(terminated(tag_no_case("print"), multispace0), separated_list0(
         trim(tag(",")),
-        map(separated_pair(parse_identifier, trim(tag("=")), parse_expr), |(n, e)| (Some(n), e)),
+        map(separated_pair(identifier, trim(tag("=")), expr), |(n, e)| (Some(n), e)),
     ))(i)
 }
 
-fn project_query(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
+fn project_operator(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     preceded(terminated(tag_no_case("project"), multispace1), separated_list0(
         tag(","),
         trim(alt((
-            map(separated_pair(parse_identifier, trim(tag("=")), parse_expr), |(n, e)| (Some(n), e)),
-            map(parse_expr, |e| (None, e))
+            map(separated_pair(identifier, trim(tag("=")), expr), |(n, e)| (Some(n), e)),
+            map(expr, |e| (None, e))
         ))),
     ))(i)
 }
 
-fn project_away_query(i: &str) -> IResult<&str, Vec<String>> {
+fn project_away_operator(i: &str) -> IResult<&str, Vec<String>> {
     preceded(terminated(tag_no_case("project-away"), multispace1), separated_list1(
         tag(","),
-        trim(parse_identifier)
+        trim(identifier)
     ))(i)
 }
 
-fn project_keep_query(i: &str) -> IResult<&str, Vec<String>> {
+fn project_keep_operator(i: &str) -> IResult<&str, Vec<String>> {
     preceded(terminated(tag_no_case("project-keep"), multispace1), separated_list1(
         tag(","),
-        trim(parse_identifier)
+        trim(identifier)
     ))(i)
 }
 
-fn project_rename_query(i: &str) -> IResult<&str, Vec<(String, String)>> {
+fn project_rename_operator(i: &str) -> IResult<&str, Vec<(String, String)>> {
     preceded(terminated(tag_no_case("project-rename"), multispace1), separated_list1(
         tag(","),
-        separated_pair(trim(parse_identifier), tag("="), trim(parse_identifier))
+        separated_pair(trim(identifier), tag("="), trim(identifier))
     ))(i)
 }
 
-fn where_query(i: &str) -> IResult<&str, Expr> {
-    preceded(terminated(tag_no_case("where"), multispace1), parse_expr)(i)
+fn where_operator(i: &str) -> IResult<&str, Expr> {
+    preceded(terminated(tag_no_case("where"), multispace1), expr)(i)
 }
 
-fn range_query(i: &str) -> IResult<&str, (String, Expr, Expr, Expr)> {
+fn range_operator(i: &str) -> IResult<&str, (String, Expr, Expr, Expr)> {
     preceded(terminated(tag_no_case("range"), multispace1), tuple((
-        terminated(parse_identifier, multispace1),
-        terminated(preceded(terminated(tag_no_case("from"), multispace1), parse_expr), multispace1),
-        terminated(preceded(terminated(tag_no_case("to"), multispace1), parse_expr), multispace1),
-        preceded(terminated(tag_no_case("step"), multispace1), parse_expr)
+        terminated(identifier, multispace1),
+        terminated(preceded(terminated(tag_no_case("from"), multispace1), expr), multispace1),
+        terminated(preceded(terminated(tag_no_case("to"), multispace1), expr), multispace1),
+        preceded(terminated(tag_no_case("step"), multispace1), expr)
     )))(i)
 }
 
-fn sample_query(i: &str) -> IResult<&str, u32> {
+fn sample_operator(i: &str) -> IResult<&str, u32> {
     preceded(
         terminated(tag_no_case("sample"), multispace1),
         map(digit1, |x| FromStr::from_str(x).unwrap())
     )(i)
 }
 
-fn sample_distinct_query(i: &str) -> IResult<&str, (u32, String)> {
+fn sample_distinct_operator(i: &str) -> IResult<&str, (u32, String)> {
     preceded(
         terminated(tag_no_case("sample-distinct"), multispace1),
         separated_pair(
             map(digit1, |x| FromStr::from_str(x).unwrap()),
             delimited(multispace1, tag_no_case("by"), multispace1),
-            parse_identifier
+            identifier
         )
     )(i)
 }
 
-fn serialize_query(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
+fn serialize_operator(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     preceded(terminated(tag_no_case("serialize"), multispace1), separated_list0(
         tag(","),
         trim(map(
-            separated_pair(parse_identifier, trim(tag("=")), parse_expr),
+            separated_pair(identifier, trim(tag("=")), expr),
             |(n, e)| (Some(n), e)
         )),
     ))(i)
 }
 
-fn summarize_query(i: &str) -> IResult<&str, (Vec<Expr>, Vec<Expr>)> {
+fn summarize_operator(i: &str) -> IResult<&str, (Vec<Expr>, Vec<Expr>)> {
     preceded(terminated(tag_no_case("summarize"), multispace1), pair(
-        separated_list0(tag(","), trim(parse_expr)),
+        separated_list0(tag(","), trim(expr)),
         map(opt(preceded(
             terminated(tag_no_case("by"), multispace1),
-            separated_list1(tag(","), trim(parse_expr))
+            separated_list1(tag(","), trim(expr))
         )), |b| b.unwrap_or_default())
     ))(i)
 }
 
-fn sort_query(i: &str) -> IResult<&str, Vec<String>> {
+fn sort_operator(i: &str) -> IResult<&str, Vec<String>> {
     preceded(tuple((tag_no_case("sort"), multispace1, tag_no_case("by"))), separated_list1(
         tag(","),
-        trim(parse_identifier)
+        trim(identifier)
     ))(i)
 }
 
-fn take_query(i: &str) -> IResult<&str, u32> {
+fn take_operator(i: &str) -> IResult<&str, u32> {
     preceded(
         terminated(alt((tag_no_case("take"), tag_no_case("limit"))), multispace1),
         map(digit1, |x| FromStr::from_str(x).unwrap())
     )(i)
 }
 
-fn union_query(i: &str) -> IResult<&str, (Options, Vec<Source>)> {
+fn union_operator(i: &str) -> IResult<&str, (Options, Vec<Source>)> {
     preceded(terminated(tag_no_case("union"), multispace1), tuple((
-        terminated(parse_options, multispace0),
+        terminated(options, multispace0),
         separated_list1(trim(tag(",")), alt((
-            delimited(tag("("), trim(parse_source), tag(")")),
-            map(parse_identifier, |e| Source::Reference(e))
+            delimited(tag("("), trim(source), tag(")")),
+            map(identifier, |e| Source::Reference(e))
         )))
     )))(i)
 }
 
-fn parse_operator(i: &str) -> IResult<&str, Operator> {
+fn operator(i: &str) -> IResult<&str, Operator> {
     alt((
-        map(as_query, |(o, a)| Operator::As(o, a)),
-        map(consume_query, |o| Operator::Consume(o)),
-        map(count_query, |_| Operator::Count),
-        map(distinct_query, |c| Operator::Distinct(c)),
-        map(evaluate_query, |(o, n, x)| Operator::Evaluate(o, n, x)),
-        map(extend_query, |e| Operator::Extend(e)),
-        map(facet_query, |(a, g)| Operator::Facet(a, g)),
-        map(getschema_query, |_| Operator::Getschema),
-        map(join_query, |(o, a, g)| Operator::Join(o, a, g)),
-        map(lookup_query, |(o, a, g)| Operator::Lookup(o, a, g)),
-        map(mv_expand_query, |e| Operator::MvExpand(e)),
+        map(as_operator, |(o, a)| Operator::As(o, a)),
+        map(consume_operator, |o| Operator::Consume(o)),
+        map(count_operator, |_| Operator::Count),
+        map(distinct_operator, |c| Operator::Distinct(c)),
+        map(evaluate_operator, |(o, n, x)| Operator::Evaluate(o, n, x)),
+        map(extend_operator, |e| Operator::Extend(e)),
+        map(facet_operator, |(a, g)| Operator::Facet(a, g)),
+        map(getschema_operator, |_| Operator::Getschema),
+        map(join_operator, |(o, a, g)| Operator::Join(o, a, g)),
+        map(lookup_operator, |(o, a, g)| Operator::Lookup(o, a, g)),
+        map(mv_expand_operator, |e| Operator::MvExpand(e)),
         alt((
-            map(project_query, |p| Operator::Project(p)),
-            map(project_away_query, |p| Operator::ProjectAway(p)),
-            map(project_keep_query, |p| Operator::ProjectKeep(p)),
-            map(project_rename_query, |p| Operator::ProjectRename(p))
+            map(project_operator, |p| Operator::Project(p)),
+            map(project_away_operator, |p| Operator::ProjectAway(p)),
+            map(project_keep_operator, |p| Operator::ProjectKeep(p)),
+            map(project_rename_operator, |p| Operator::ProjectRename(p))
         )),
-        map(parse_op, |(o, e, p)| Operator::Parse(o, e, p)),
+        map(parse_operator, |(o, e, p)| Operator::Parse(o, e, p)),
         alt((
-            map(sample_query, |s| Operator::Sample(s)),
-            map(sample_distinct_query, |(s, c)| Operator::SampleDistinct(s, c))
+            map(sample_operator, |s| Operator::Sample(s)),
+            map(sample_distinct_operator, |(s, c)| Operator::SampleDistinct(s, c))
         )),
-        map(serialize_query, |e| Operator::Serialize(e)),
-        map(summarize_query, |(a, g)| Operator::Summarize(a, g)),
-        map(sort_query, |o| Operator::Sort(o)),
-        map(take_query, |t| Operator::Take(t)),
-        map(union_query, |(o, s)| Operator::Union(o, s)),
-        map(where_query, |e| Operator::Where(e))
+        map(serialize_operator, |e| Operator::Serialize(e)),
+        map(summarize_operator, |(a, g)| Operator::Summarize(a, g)),
+        map(sort_operator, |o| Operator::Sort(o)),
+        map(take_operator, |t| Operator::Take(t)),
+        map(union_operator, |(o, s)| Operator::Union(o, s)),
+        map(where_operator, |e| Operator::Where(e))
     ))(i)
 }
 
-fn parse_source(i: &str) -> IResult<&str, Source> {
+fn source(i: &str) -> IResult<&str, Source> {
     alt((
-        map(datatable_query, |(a, g)| Source::Datatable(a, g)),
-        map(externaldata_query, |(t, c)| Source::Externaldata(t, c)),
-        map(print_query, |e| Source::Print(e)),
-        map(range_query, |(c, f, t, s)| Source::Range(c, f, t, s)),
-        map(union_query, |(o, s)| Source::Union(o, s)),
-        map(parse_identifier, |e| Source::Reference(e))
+        map(datatable_operator, |(a, g)| Source::Datatable(a, g)),
+        map(externaldata_operator, |(t, c)| Source::Externaldata(t, c)),
+        map(print_operator, |e| Source::Print(e)),
+        map(range_operator, |(c, f, t, s)| Source::Range(c, f, t, s)),
+        map(union_operator, |(o, s)| Source::Union(o, s)),
+        map(identifier, |e| Source::Reference(e))
     ))(i)
 }
 
 pub fn parse_query(i: &str) -> IResult<&str, Query> {
-    map(separated_pair(parse_source, multispace0, many0(preceded(terminated(tag("|"), multispace0), parse_operator))),
+    map(separated_pair(source, multispace0, many0(preceded(terminated(tag("|"), multispace0), operator))),
     |(source, operators)| Query {
         source,
         operators
