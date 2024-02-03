@@ -12,6 +12,7 @@ pub struct Query {
 pub enum Source {
     Datatable(Vec<(String, Type)>, Vec<Expr>),
     Externaldata(Vec<(String, Type)>, Vec<String>),
+    Find(Options, Option<Vec<Source>>, Expr, FindProjection),
     Print(Vec<(Option<String>, Expr)>),
     Range(String, Expr, Expr, Expr),
     Reference(String),
@@ -82,6 +83,12 @@ pub enum Literal {
     Long(Option<i64>),
     String(String),
     Timespan(Option<i64>)
+}
+
+#[derive(Debug, PartialEq)]
+pub enum FindProjection {
+    ProjectSmart,
+    Project(Vec<String>)
 }
 
 #[derive(Debug, PartialEq)]

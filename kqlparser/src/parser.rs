@@ -273,6 +273,27 @@ fn facet_operator(i: &str) -> IResult<&str, (Vec<String>, Vec<Operator>)> {
     ))(i)
 }
 
+fn find_operator(i: &str) -> IResult<&str, (Options, (Option<Vec<Source>>, Expr), FindProjection)> {
+    preceded(terminated(tag_no_case("find"), multispace1), tuple((
+        terminated(options, multispace0),
+        alt((
+            map(separated_pair(
+                preceded(
+                    terminated(tag("in"), multispace1), 
+                    delimited(tag("("), separated_list1(tag(","), trim(source)), tag(")"))
+                ),
+                multispace1,
+                preceded(terminated(tag("where"), multispace1), expr)
+            ), |(s, e)| (Some(s), e)),
+            map(expr, |e| (None, e))
+        )),
+        map(opt(preceded(multispace1, alt((
+            map(tag("project-smart"), |_| FindProjection::ProjectSmart),
+            map(preceded(terminated(tag("project"), multispace1), separated_list1(trim(tag(",")), identifier)), |c| FindProjection::Project(c))
+        )))), |x| x.unwrap_or(FindProjection::ProjectSmart))
+    )))(i)
+}
+
 fn getschema_operator(i: &str) -> IResult<&str, ()> {
     map(terminated(tag_no_case("getschema"), multispace1), |_| ())(i)
 }
@@ -461,6 +482,7 @@ fn source(i: &str) -> IResult<&str, Source> {
     alt((
         map(datatable_operator, |(a, g)| Source::Datatable(a, g)),
         map(externaldata_operator, |(t, c)| Source::Externaldata(t, c)),
+        map(find_operator, |(o, (s, e), p)| Source::Find(o, s, e, p)),
         map(print_operator, |e| Source::Print(e)),
         map(range_operator, |(c, f, t, s)| Source::Range(c, f, t, s)),
         map(union_operator, |(o, s)| Source::Union(o, s)),
