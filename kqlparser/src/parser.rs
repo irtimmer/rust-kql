@@ -346,6 +346,14 @@ fn parse_operator(i: &str) -> IResult<&str, (Options, Expr, Vec<PatternToken>)> 
     )))(i)
 }
 
+fn parse_where_operator(i: &str) -> IResult<&str, (Options, Expr, Vec<PatternToken>)> {
+    preceded(terminated(tag_no_case("parse-where"), multispace1), tuple((
+        terminated(options, multispace0),
+        terminated(expr, multispace0),
+        preceded(terminated(tag("with"), multispace1), pattern)
+    )))(i)
+}
+
 fn print_operator(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     preceded(terminated(tag_no_case("print"), multispace0), separated_list0(
         trim(tag(",")),
@@ -479,7 +487,10 @@ fn operator(i: &str) -> IResult<&str, Operator> {
             map(project_keep_operator, |p| Operator::ProjectKeep(p)),
             map(project_rename_operator, |p| Operator::ProjectRename(p))
         )),
-        map(parse_operator, |(o, e, p)| Operator::Parse(o, e, p)),
+        alt((
+            map(parse_operator, |(o, e, p)| Operator::Parse(o, e, p)),
+            map(parse_where_operator, |(o, e, p)| Operator::ParseWhere(o, e, p)),
+        )),
         alt((
             map(sample_operator, |s| Operator::Sample(s)),
             map(sample_distinct_operator, |(s, c)| Operator::SampleDistinct(s, c))

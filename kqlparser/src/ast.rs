@@ -34,6 +34,7 @@ pub enum Operator {
     Lookup(Options, Query, Vec<String>),
     MvExpand(String),
     Parse(Options, Expr, Vec<PatternToken>),
+    ParseWhere(Options, Expr, Vec<PatternToken>),
     Project(Vec<(Option<String>, Expr)>),
     ProjectAway(Vec<String>),
     ProjectKeep(Vec<String>),
