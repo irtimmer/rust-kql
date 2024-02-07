@@ -1,13 +1,24 @@
 [workspace]
-workspace.resolver = "2"
+resolver = "2"
 members = [
     "datafusion-kql",
     "kq",
     "kqlparser"
 ]
 
+[workspace.package]
+authors = ["Iwan Timmer <irtimmer@gmail.com>"]
+edition = "2021"
+homepage = "https://github.com/irtimmer/rust-kql"
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/irtimmer/rust-kql"
+version = "0.0.1"
+
 [workspace.dependencies]
 arrow-schema = "49.0.0"
 datafusion = "34.0.0"
 datafusion-common = "34.0.0"
 datafusion-expr = "34.0.0"
+kqlparser = { path = "kqlparser", version = "0.0.1" }
+datafusion-kql = { path = "datafusion-kql", version = "0.0.1" }

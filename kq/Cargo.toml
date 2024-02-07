@@ -1,11 +1,15 @@
 [package]
 name = "kq"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+authors = { workspace = true }
 
 [dependencies]
 clap = { version = "4.4", features = ["derive", "cargo"] }
-datafusion-kql = { path = "../datafusion-kql" }
+datafusion-kql = { workspace = true }
 datafusion = { workspace = true }
-kqlparser = { path = "../kqlparser" }
+kqlparser = { workspace = true }
 tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "sync"] }

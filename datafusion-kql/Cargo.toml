@@ -1,11 +1,16 @@
 [package]
 name = "datafusion-kql"
-version = "0.1.0"
-authors = ["Iwan Timmer <irtimmer@gmail.com>"]
-edition = "2021"
+description = "DataFusion KQL Query Planner"
+keywords = ["datafusion", "kql", "parser", "planner"]
+version = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+authors = { workspace = true }
 
 [dependencies]
-kqlparser = { path = "../kqlparser" }
+kqlparser = { workspace = true }
 arrow-schema = { workspace = true }
 datafusion-common = { workspace = true }
 datafusion-expr = { workspace = true }
