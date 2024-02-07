@@ -73,6 +73,7 @@ pub enum Expr {
 pub enum Type {
     Bool,
     DateTime,
+    Dynamic,
     Int,
     Long,
     String,
@@ -83,6 +84,7 @@ pub enum Type {
 pub enum Literal {
     Bool(Option<bool>),
     DateTime(Option<DateTime>),
+    Dynamic(Option<Dynamic>),
     Int(Option<i32>),
     Long(Option<i64>),
     String(String),
@@ -98,6 +100,18 @@ pub struct DateTime {
     pub minute: u32,
     pub second: u32,
     pub timezone: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Dynamic {
+    Array(Vec<Option<Dynamic>>),
+    Bool(Option<bool>),
+    DateTime(Option<DateTime>),
+    Dictionary(HashMap<String, Option<Dynamic>>),
+    Int(Option<i32>),
+    Long(Option<i64>),
+    String(String),
+    Timespan(Option<i64>)
 }
 
 #[derive(Debug, PartialEq)]

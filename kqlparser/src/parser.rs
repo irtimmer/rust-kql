@@ -16,6 +16,7 @@ fn type_tag(i: &str) -> IResult<&str, Type> {
     alt((
         map(tag("bool"), |_| Type::Bool),
         value(Type::DateTime, alt((tag("datetime"), tag("date")))),
+        value(Type::Dynamic, tag("dynamic")),
         map(tag("int"), |_| Type::Int),
         map(tag("long"), |_| Type::Long),
         map(tag("string"), |_| Type::String),
@@ -79,6 +80,29 @@ fn date(i: &str) -> IResult<&str, Option<DateTime>> {
     ))(i)
 }
 
+fn dynamic(i: &str) -> IResult<&str, Option<Dynamic>> {
+    alt((
+        map(delimited(tag("["), separated_list0(tag(","), trim(dynamic)), tag("]")), |x| Some(Dynamic::Array(x))),
+        map(delimited(tag("{"), separated_list0(tag(","), separated_pair(trim(string), tag(":"), trim(dynamic))), tag("}")), |x| Some(Dynamic::Dictionary(x.into_iter().collect()))),
+        map(preceded(tag("bool"), delimited(tag("("), trim(boolean), tag(")"))), |x| Some(Dynamic::Bool(x))),
+        map(preceded(tag("datetime"), delimited(tag("("), trim(date), tag(")"))), |x| Some(Dynamic::DateTime(x))),
+        map(preceded(tag("int"), delimited(tag("("), trim(integer), tag(")"))), |x| Some(Dynamic::Int(x))),
+        map(preceded(tag("long"), delimited(tag("("), trim(long), tag(")"))), |x| Some(Dynamic::Long(x))),
+        map(preceded(alt((tag("timespan"), tag("time"))), delimited(tag("("), trim(timespan), tag(")"))), |x| Some(Dynamic::Timespan(x))),
+        map(preceded(tag_no_case("0x"), hex_digit1), |x| Some(Dynamic::Long(Some(i64::from_str_radix(x, 16).unwrap())))),
+        map(terminated(decimal, alt((tag("days"), tag("day"), tag("d")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60 * 24))))),
+        map(terminated(decimal, alt((tag("hours"), tag("hour"), tag("h")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60))))),
+        map(terminated(decimal, alt((tag("minutes"), tag("minute"), tag("m")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60))))),
+        map(terminated(decimal, alt((tag("seconds"), tag("second"), tag("s")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000))))),
+        map(terminated(decimal, alt((tag("milliseconds"), tag("millisecond"), tag("milli"), tag("ms")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000 * 1000))))),
+        map(terminated(decimal, alt((tag("microseconds"), tag("microsecond"), tag("micro")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000))))),
+        map(terminated(decimal, alt((tag("ticks"), tag("tick")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 100))))),
+        value(Some(Dynamic::Bool(Some(true))), tag("true")),
+        value(Some(Dynamic::Bool(Some(false))), tag("false")),
+        value(None, tag("null"))
+    ))(i)
+}
+
 fn integer(i: &str) -> IResult<&str, Option<i32>> {
     alt((
         map(preceded(tag_no_case("0x"), hex_digit1), |x| Some(i32::from_str_radix(x, 16).unwrap())),
@@ -120,6 +144,7 @@ fn literal(i: &str) -> IResult<&str, Literal> {
     alt((
         map(preceded(tag("bool"), delimited(tag("("), trim(boolean), tag(")"))), |x| Literal::Bool(x)),
         map(preceded(tag("datetime"), delimited(tag("("), trim(date), tag(")"))), |x| Literal::DateTime(x)),
+        map(preceded(tag("dynamic"), delimited(tag("("), trim(dynamic), tag(")"))), |x| Literal::Dynamic(x)),
         map(preceded(tag("int"), delimited(tag("("), trim(integer), tag(")"))), |x| Literal::Int(x)),
         map(preceded(tag("long"), delimited(tag("("), trim(long), tag(")"))), |x| Literal::Long(x)),
         map(preceded(alt((tag("timespan"), tag("time"))), delimited(tag("("), trim(timespan), tag(")"))), |x| Literal::Timespan(x)),
