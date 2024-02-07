@@ -72,6 +72,7 @@ pub enum Expr {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Bool,
+    DateTime,
     Int,
     Long,
     String,
@@ -81,10 +82,22 @@ pub enum Type {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     Bool(Option<bool>),
+    DateTime(Option<DateTime>),
     Int(Option<i32>),
     Long(Option<i64>),
     String(String),
     Timespan(Option<i64>)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DateTime {
+    pub year: u32,
+    pub month: u32,
+    pub day: u32,
+    pub hour: u32,
+    pub minute: u32,
+    pub second: u32,
+    pub timezone: Option<String>,
 }
 
 #[derive(Debug, PartialEq)]

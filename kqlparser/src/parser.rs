@@ -4,17 +4,19 @@ use nom::branch::alt;
 use nom::bytes::complete::{tag, tag_no_case, take_while1, escaped, is_a};
 use nom::character::complete::{digit1, multispace0, multispace1, none_of, one_of, hex_digit1};
 use nom::character::streaming::{u64, i64};
-use nom::combinator::{map, opt, recognize};
+use nom::combinator::{map, opt, recognize, value};
 use nom::multi::{many0, separated_list0, separated_list1, fold_many0, many1};
 use nom::sequence::{tuple, preceded, delimited, separated_pair, terminated, pair};
 use nom::IResult;
 
 use super::ast::*;
+use super::datetime::{iso8601_datetime, rfc822_datetime, rfc850_datetime};
 use super::{dec_to_i64, decimal, is_kql_identifier, take_identifier, trim};
 
 fn type_tag(i: &str) -> IResult<&str, Type> {
     alt((
         map(tag("bool"), |_| Type::Bool),
+        value(Type::DateTime, alt((tag("datetime"), tag("date")))),
         map(tag("int"), |_| Type::Int),
         map(tag("long"), |_| Type::Long),
         map(tag("string"), |_| Type::String),
@@ -69,6 +71,15 @@ fn boolean(i: &str) -> IResult<&str, Option<bool>> {
     ))(i)
 }
 
+fn date(i: &str) -> IResult<&str, Option<DateTime>> {
+    alt((
+        map(iso8601_datetime, |x| Some(x)),
+        map(rfc822_datetime, |x| Some(x)),
+        map(rfc850_datetime, |x| Some(x)),
+        map(tag("null"), |_| None)
+    ))(i)
+}
+
 fn integer(i: &str) -> IResult<&str, Option<i32>> {
     alt((
         map(preceded(tag_no_case("0x"), hex_digit1), |x| Some(i32::from_str_radix(x, 16).unwrap())),
@@ -109,6 +120,7 @@ fn timespan(i: &str) -> IResult<&str, Option<i64>> {
 fn literal(i: &str) -> IResult<&str, Literal> {
     alt((
         map(preceded(tag("bool"), delimited(tag("("), trim(boolean), tag(")"))), |x| Literal::Bool(x)),
+        map(preceded(tag("datetime"), delimited(tag("("), trim(date), tag(")"))), |x| Literal::DateTime(x)),
         map(preceded(tag("int"), delimited(tag("("), trim(integer), tag(")"))), |x| Literal::Int(x)),
         map(preceded(tag("long"), delimited(tag("("), trim(long), tag(")"))), |x| Literal::Long(x)),
         map(preceded(alt((tag("timespan"), tag("time"))), delimited(tag("("), trim(timespan), tag(")"))), |x| Literal::Timespan(x)),
