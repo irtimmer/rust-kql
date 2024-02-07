@@ -1,6 +1,5 @@
 use nom::bytes::complete::{tag, take_while1};
-use nom::character::complete::multispace0;
-use nom::character::streaming::{i64, u64};
+use nom::character::complete::{i64, multispace0, u64};
 use nom::combinator::{map, opt, consumed};
 use nom::error::ParseError;
 use nom::sequence::{delimited, pair, preceded};

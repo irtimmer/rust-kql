@@ -2,8 +2,7 @@ use std::str::{self, FromStr};
 
 use nom::branch::alt;
 use nom::bytes::complete::{tag, tag_no_case, take_while1, escaped, is_a};
-use nom::character::complete::{digit1, multispace0, multispace1, none_of, one_of, hex_digit1};
-use nom::character::streaming::{u64, i64};
+use nom::character::complete::{digit1, i64, multispace0, multispace1, none_of, one_of, u64, hex_digit1};
 use nom::combinator::{map, opt, recognize, value};
 use nom::multi::{many0, separated_list0, separated_list1, fold_many0, many1};
 use nom::sequence::{tuple, preceded, delimited, separated_pair, terminated, pair};
@@ -229,11 +228,11 @@ fn as_operator(i: &str) -> IResult<&str, (Options, String)> {
 }
 
 fn consume_operator(i: &str) -> IResult<&str, Options> {
-    preceded(terminated(tag_no_case("consume"), multispace1), options)(i)
+    preceded(tag_no_case("consume"), options)(i)
 }
 
 fn count_operator(i: &str) -> IResult<&str, ()> {
-    map(terminated(tag_no_case("count"), multispace1), |_| ())(i)
+    map(tag_no_case("count"), |_| ())(i)
 }
 
 fn datatable_operator(i: &str) -> IResult<&str, (Vec<(String, Type)>, Vec<Expr>)> {
@@ -529,7 +528,7 @@ fn source(i: &str) -> IResult<&str, Source> {
 }
 
 pub fn parse_query(i: &str) -> IResult<&str, Query> {
-    map(separated_pair(source, multispace0, many0(preceded(terminated(tag("|"), multispace0), operator))),
+    map(separated_pair(source, multispace0, many0(preceded(tag("|"), trim(operator)))),
     |(source, operators)| Query {
         source,
         operators
