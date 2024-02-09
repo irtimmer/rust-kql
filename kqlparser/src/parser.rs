@@ -2,7 +2,7 @@ use std::str::{self, FromStr};
 
 use nom::branch::alt;
 use nom::bytes::complete::{tag, tag_no_case, take_while1, escaped, is_a};
-use nom::character::complete::{digit1, i64, multispace0, multispace1, none_of, one_of, u64, hex_digit1};
+use nom::character::complete::{digit1, i64, multispace0, multispace1, none_of, one_of, u32, u64, hex_digit1};
 use nom::combinator::{map, opt, recognize, value};
 use nom::multi::{many0, separated_list0, separated_list1, fold_many0, many1};
 use nom::sequence::{tuple, preceded, delimited, separated_pair, terminated, pair};
@@ -509,6 +509,24 @@ fn take_operator(i: &str) -> IResult<&str, u32> {
     )(i)
 }
 
+fn top_operator(i: &str) -> IResult<&str, (u32, Expr, bool, bool)> {
+    map(preceded(
+        terminated(tag_no_case("top"), multispace1),
+        tuple((
+            terminated(u32, multispace1),
+            preceded(terminated(tag("by"), multispace1), trim(expr)),
+            opt(terminated(alt((
+                value(true, tag("asc")),
+                value(false, tag("desc"))
+            )), multispace0)),
+            opt(preceded(terminated(tag("nulls"), multispace1), alt((
+                value(true, tag("first")),
+                value(false, tag("last"))
+            )))),
+        ))
+    ), |(n, e, s, o)| (n, e, s.unwrap_or(false), o.unwrap_or(s.unwrap_or(false))))(i)
+}
+
 fn union_operator(i: &str) -> IResult<&str, (Options, Vec<Source>)> {
     preceded(terminated(tag_no_case("union"), multispace1), tuple((
         terminated(options, multispace0),
@@ -553,7 +571,10 @@ fn operator(i: &str) -> IResult<&str, Operator> {
         map(serialize_operator, |e| Operator::Serialize(e)),
         map(summarize_operator, |(a, g)| Operator::Summarize(a, g)),
         map(sort_operator, |o| Operator::Sort(o)),
-        map(take_operator, |t| Operator::Take(t)),
+        alt((
+            map(take_operator, |t| Operator::Take(t)),
+            map(top_operator, |(n, e, s, o)| Operator::Top(n, e, s, o))
+        )),
         map(union_operator, |(o, s)| Operator::Union(o, s)),
         map(where_operator, |e| Operator::Where(e))
     ))(i)

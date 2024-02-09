@@ -46,6 +46,7 @@ pub enum Operator {
     Summarize(Vec<Expr>, Vec<Expr>),
     Sort(Vec<String>),
     Take(u32),
+    Top(u32, Expr, bool, bool),
     Union(Options, Vec<Source>),
     Where(Expr)
 }
