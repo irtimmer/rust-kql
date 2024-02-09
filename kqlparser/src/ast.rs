@@ -32,6 +32,7 @@ pub enum Operator {
     Getschema,
     Join(Options, Query, Vec<String>),
     Lookup(Options, Query, Vec<String>),
+    MvApply(Vec<((String, String), Option<Type>)>, Vec<Operator>),
     MvExpand(String),
     Parse(Options, Expr, Vec<PatternToken>),
     ParseWhere(Options, Expr, Vec<PatternToken>),

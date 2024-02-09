@@ -370,6 +370,22 @@ fn lookup_operator(i: &str) -> IResult<&str, (Options, Query, Vec<String>)> {
     )))(i)
 }
 
+fn mv_apply_operator(i: &str) -> IResult<&str, (Vec<((String, String), Option<Type>)>, Vec<Operator>)> {
+    preceded(terminated(tag_no_case("mv-apply"), multispace1), tuple((
+        separated_list1(tag(","), trim(pair(
+            separated_pair(trim(identifier), tag("="), trim(identifier)),
+            opt(preceded(
+                tuple((multispace1, tag("to"), multispace1, tag("typeof"), multispace0)),
+                delimited(tag("("), trim(type_tag), tag(")"))
+            ))
+        ))),
+        preceded(
+            terminated(tag("on"), multispace1),
+            delimited(tag("("), separated_list1(tag("|"), trim(operator)), tag(")"))
+        )
+    )))(i)
+}
+
 fn mv_expand_operator(i: &str) -> IResult<&str, String> {
     preceded(terminated(tag_no_case("mv-expand"), multispace1), identifier)(i)
 }
@@ -516,7 +532,10 @@ fn operator(i: &str) -> IResult<&str, Operator> {
         map(getschema_operator, |_| Operator::Getschema),
         map(join_operator, |(o, a, g)| Operator::Join(o, a, g)),
         map(lookup_operator, |(o, a, g)| Operator::Lookup(o, a, g)),
-        map(mv_expand_operator, |e| Operator::MvExpand(e)),
+        alt((
+            map(mv_apply_operator, |(a, g)| Operator::MvApply(a, g)),
+            map(mv_expand_operator, |e| Operator::MvExpand(e)),
+        )),
         alt((
             map(project_operator, |p| Operator::Project(p)),
             map(project_away_operator, |p| Operator::ProjectAway(p)),

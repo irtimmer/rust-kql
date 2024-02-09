@@ -67,7 +67,7 @@ fork|✅|❌
 getschema|✅|❌
 join|✅|🚧
 lookup|✅|❌
-mv-apply|❌|❌
+mv-apply|✅|❌
 mv-expand|✅|✅
 print|✅|❌
 project|✅|✅
