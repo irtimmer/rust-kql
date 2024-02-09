@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-pub type Options = HashMap<String, Literal>;
+pub type Options = HashMap<String, OptionLiteral>;
 
 #[derive(Debug, PartialEq)]
 pub struct Query {
@@ -91,6 +91,13 @@ pub enum Literal {
     Long(Option<i64>),
     String(String),
     Timespan(Option<i64>)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum OptionLiteral {
+    Bool(bool),
+    Long(i64),
+    String(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]

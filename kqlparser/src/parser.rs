@@ -24,11 +24,20 @@ fn type_tag(i: &str) -> IResult<&str, Type> {
     ))(i)
 }
 
+fn option_literal(i: &str) -> IResult<&str, OptionLiteral> {
+    alt((
+        value(OptionLiteral::Bool(true), tag("true")),
+        value(OptionLiteral::Bool(false), tag("false")),
+        map(i64, |x| OptionLiteral::Long(x)),
+        map(take_while1(|c: char| !c.is_whitespace()), |s: &str| OptionLiteral::String(s.to_string())),
+    ))(i)
+}
+
 fn options(i: &str) -> IResult<&str, Options> {
     map(separated_list0(multispace1, separated_pair(
         identifier,
         trim(tag("=")),
-        literal
+        option_literal
     )), |x| x.into_iter().collect())(i)
 }
 
