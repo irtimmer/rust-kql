@@ -17,6 +17,11 @@ pub fn is_kql_identifier(chr: char) -> bool {
     chr.is_alphanumeric() || chr == '_'
 }
 
+#[inline]
+pub fn is_kql_wildcard_identifier(chr: char) -> bool {
+    is_kql_identifier(chr) || chr == '*'
+}
+
 pub fn take_identifier(i: &str) -> IResult<&str, &str> {
     let (input, identifier) = take_while1(is_kql_identifier)(i)?;
 

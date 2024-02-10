@@ -10,7 +10,7 @@ use nom::IResult;
 
 use super::ast::*;
 use super::datetime::{iso8601_datetime, rfc822_datetime, rfc850_datetime};
-use super::{dec_to_i64, decimal, is_kql_identifier, take_identifier, trim};
+use super::{dec_to_i64, decimal, is_kql_identifier, is_kql_wildcard_identifier, take_identifier, trim};
 
 fn type_tag(i: &str) -> IResult<&str, Type> {
     alt((
@@ -62,6 +62,10 @@ fn type_mapping(i: &str) -> IResult<&str, Vec<(String, Type)>> {
 
 fn identifier(i: &str) -> IResult<&str, String> {
     map(take_identifier, |i| i.to_string())(i)
+}
+
+fn wildcard_identifier(i: &str) -> IResult<&str, String> {
+    map(take_while1(is_kql_wildcard_identifier), |i: &str| i.to_string())(i)
 }
 
 fn string(i: &str) -> IResult<&str, String> {
@@ -453,6 +457,18 @@ fn project_rename_operator(i: &str) -> IResult<&str, Vec<(String, String)>> {
     ))(i)
 }
 
+fn project_reorder_operator(i: &str) -> IResult<&str, Vec<(String, Option<(bool, bool)>)>> {
+    preceded(terminated(tag_no_case("project-reorder"), multispace1), separated_list1(
+        tag(","),
+        trim(pair(wildcard_identifier, opt(preceded(multispace1, alt((
+            value((true, false), tag("asc")),
+            value((false, false), tag("desc")),
+            value((true, true), tag("granny-asc")),
+            value((false, true), tag("granny-desc"))
+        ))))))
+    ))(i)
+}
+
 fn where_operator(i: &str) -> IResult<&str, Expr> {
     preceded(terminated(tag_no_case("where"), multispace1), expr)(i)
 }
@@ -567,7 +583,8 @@ fn operator(i: &str) -> IResult<&str, Operator> {
             map(project_operator, |p| Operator::Project(p)),
             map(project_away_operator, |p| Operator::ProjectAway(p)),
             map(project_keep_operator, |p| Operator::ProjectKeep(p)),
-            map(project_rename_operator, |p| Operator::ProjectRename(p))
+            map(project_rename_operator, |p| Operator::ProjectRename(p)),
+            map(project_reorder_operator, |p| Operator::ProjectReorder(p))
         )),
         alt((
             map(parse_operator, |(o, e, p)| Operator::Parse(o, e, p)),

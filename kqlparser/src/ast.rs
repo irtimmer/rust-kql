@@ -40,6 +40,7 @@ pub enum Operator {
     ProjectAway(Vec<String>),
     ProjectKeep(Vec<String>),
     ProjectRename(Vec<(String, String)>),
+    ProjectReorder(Vec<(String, Option<(bool, bool)>)>),
     Sample(u32),
     SampleDistinct(u32, String),
     Serialize(Vec<(Option<String>, Expr)>),

@@ -74,7 +74,7 @@ project|✅|✅
 project-away|✅|❌
 project-keep|✅|❌
 project-rename|✅|❌
-project-reorder|❌|❌
+project-reorder|✅|❌
 parse|✅|❌
 parse-where|✅|❌
 parse-kv|❌|❌
