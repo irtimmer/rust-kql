@@ -3,8 +3,8 @@ use arrow_schema::DataType;
 use datafusion_common::{TableReference, JoinType, Column, DFSchema, DFField, ScalarValue};
 use datafusion_common::{DataFusionError, Result};
 
-use datafusion_expr::{aggregate_function, Values};
-use datafusion_expr::expr::{AggregateFunction, Sort};
+use datafusion_expr::{aggregate_function, AggregateFunction as BuiltinAggregateFunction, BuiltinScalarFunction, BuiltInWindowFunction, WindowFrame, window_function, Values};
+use datafusion_expr::expr::{AggregateFunction, Sort, ScalarFunction, WindowFunction};
 use datafusion_expr::expr_fn::col;
 use datafusion_expr::logical_plan::{LogicalPlan, LogicalPlanBuilder};
 use datafusion_expr::{AggregateUDF, Expr, Literal, ScalarUDF, TableSource};
@@ -15,6 +15,7 @@ use kqlparser::ast::{Expr as KqlExpr, Operator, TabularExpression, Literal as Kq
 
 use std::collections::HashMap;
 use std::iter;
+use std::str::FromStr;
 use std::sync::Arc;
 
 pub trait ContextProvider {
@@ -36,12 +37,18 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
     fn func_to_expr(&self, ctx: &mut PlannerContext, name: &str, args: &Vec<KqlExpr>) -> Result<Expr> {
         let args = args.iter().map(|a| self.ast_to_expr(ctx, a)).collect::<Result<Vec<Expr>>>()?;
         Ok(match name {
-            "count" => aggr_func(aggregate_function::AggregateFunction::Count, args),
-            "max" => aggr_func(aggregate_function::AggregateFunction::Max, args),
-            "min" => aggr_func(aggregate_function::AggregateFunction::Min, args),
-            "avg" => aggr_func(aggregate_function::AggregateFunction::Avg, args),
-            "sum" => aggr_func(aggregate_function::AggregateFunction::Sum, args),
-            _ => {
+            "make_list" => aggr_func(aggregate_function::AggregateFunction::ArrayAgg, args),
+            "split" => scalar_func(BuiltinScalarFunction::StringToArray, args),
+            "next" => window_func(BuiltInWindowFunction::Lag, args),
+            "prev" => window_func(BuiltInWindowFunction::Lead, args),
+            "row_number" => window_func(BuiltInWindowFunction::RowNumber, args),
+            _ => if let Ok(f) = BuiltinScalarFunction::from_str(name) {
+                scalar_func(f, args)
+            } else if let Ok(f) = BuiltinAggregateFunction::from_str(name) {
+                aggr_func(f, args)
+            } else if let Ok(f) = BuiltInWindowFunction::from_str(name) {
+                window_func(f, args)
+            } else {
                 return Err(DataFusionError::NotImplemented("Function not implemented".to_string()));
             }
         })
@@ -142,4 +149,12 @@ fn literal_to_expr(val: &KqlLiteral) -> Expr {
 
 fn aggr_func(func: aggregate_function::AggregateFunction, args: Vec<Expr>) -> Expr {
     Expr::AggregateFunction(AggregateFunction::new(func, args, false, None, None))
+}
+
+fn scalar_func(func: BuiltinScalarFunction, args: Vec<Expr>) -> Expr {
+    Expr::ScalarFunction(ScalarFunction::new(func, args))
+}
+
+fn window_func(func: BuiltInWindowFunction, args: Vec<Expr>) -> Expr {
+    Expr::WindowFunction(WindowFunction::new(window_function::WindowFunction::BuiltInWindowFunction(func), args, vec![], vec![], WindowFrame::new(false)))
 }
