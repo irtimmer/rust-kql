@@ -16,7 +16,7 @@ use crate::kql::execute_kql;
 struct Cli {
     #[arg(short, long)]
     file: Vec<PathBuf>,
-    query: String
+    query: Option<String>
 }
 
 async fn execute(ctx: &SessionContext, query: &str) -> Result<(), Box<dyn Error>> {
@@ -40,11 +40,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Some("csv") => ctx.register_csv(base, file.as_os_str().to_str().unwrap(), Default::default()).await?,
             Some("json") => ctx.register_json(base, file.as_os_str().to_str().unwrap(), Default::default()).await?,
             Some("parquet") => ctx.register_parquet(base, file.as_os_str().to_str().unwrap(), Default::default()).await?,
+            Some("kql") => {
+                let query = std::fs::read_to_string(file)?;
+                execute(&ctx, &query).await?
+            },
             Some(ext) => return Err(format!("File extension '{}' not supported", ext).into()),
             None => return Err("File without extension not supported".into()),
         }
     }
 
-    execute(&ctx, &args.query).await?;
+    if let Some(query) = &args.query {
+        execute(&ctx, query).await?;
+        return Ok(());
+    }
     Ok(())
 }
