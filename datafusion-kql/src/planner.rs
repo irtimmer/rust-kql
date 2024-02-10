@@ -133,6 +133,7 @@ fn type_to_datatype(t: &Type) -> DataType {
     match t {
         Type::Bool => DataType::Boolean,
         Type::Int => DataType::Int32,
+        Type::Long => DataType::Int64,
         Type::String => DataType::Utf8,
         _ => panic!("Not supported")
     }
@@ -142,6 +143,7 @@ fn literal_to_expr(val: &KqlLiteral) -> Expr {
     match val {
         KqlLiteral::Bool(x) => ScalarValue::from(*x).lit(),
         KqlLiteral::Int(x) => ScalarValue::from(*x).lit(),
+        KqlLiteral::Long(x) => ScalarValue::from(*x).lit(),
         KqlLiteral::String(x) => ScalarValue::from(x.clone()).lit(),
         _ => panic!("Not supported")
     }
