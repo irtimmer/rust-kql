@@ -68,8 +68,8 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
         })
     }
 
-    fn query_statement_to_plan(&self, ctx: &mut PlannerContext, query: TabularExpression) -> Result<LogicalPlan> {
-        let mut builder = match query.source {
+    fn query_statement_to_plan(&self, ctx: &mut PlannerContext, query: &TabularExpression) -> Result<LogicalPlan> {
+        let mut builder = match &query.source {
             Source::Datatable(s, d) => LogicalPlanBuilder::from(LogicalPlan::Values(Values {
                 schema: Arc::new(DFSchema::new_with_metadata(s.iter().map(|(n, t)| DFField::new::<TableReference>(None, n, type_to_datatype(t), true)).collect(), HashMap::default()).unwrap()),
                 values: d.iter().chunks(s.len()).into_iter().map(|chunk| chunk.map(|r| self.ast_to_expr(ctx, r).unwrap()).collect()).collect()
@@ -78,7 +78,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
             _ => return Err(DataFusionError::NotImplemented("Source not implemented".to_string())),
         };
 
-        for op in query.operators.into_iter() {
+        for op in query.operators.iter() {
             builder = match op {
                 Operator::MvExpand(x) => builder.unnest_column(Column::from(x))?,
                 Operator::Extend(x) => {
@@ -94,7 +94,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
                 },
                 Operator::Join(_, x, y) => {
                     let keys: Vec<&str> = y.iter().map(|s| s.as_ref()).collect();
-                    builder.join(self.query_statement_to_plan(ctx, x)?, JoinType::Inner, (keys.clone(), keys), Option::None)?
+                    builder.join(self.query_statement_to_plan(ctx, &x)?, JoinType::Inner, (keys.clone(), keys), Option::None)?
                 },
                 Operator::Project(x) => builder.project(x.iter().map(|(a, b)| {
                     let mut expr = self.ast_to_expr(ctx, b).unwrap();
@@ -109,7 +109,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
                     builder.aggregate(y.iter().map(|z| self.ast_to_expr(&mut ctx1, z).unwrap()), x.iter().map(|z| self.ast_to_expr(ctx, z).unwrap()))?
                 },
                 Operator::Sort(o) => o.iter().fold(builder, |b, c| b.sort(iter::once(Expr::Sort(Sort::new(Box::new(col(c)), false, false)))).unwrap()),
-                Operator::Take(x) => builder.limit(0, Some(x.try_into().unwrap()))?,
+                Operator::Take(x) => builder.limit(0, Some((*x).try_into().unwrap()))?,
                 _ => return Err(DataFusionError::NotImplemented("Operator not implemented".to_string())),
             };
         }
@@ -117,7 +117,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
         builder.build()
     }
 
-    pub fn query_to_plan(&self, query: TabularExpression) -> Result<LogicalPlan> {
+    pub fn query_to_plan(&self, query: &TabularExpression) -> Result<LogicalPlan> {
         self.query_statement_to_plan(&mut PlannerContext::default(), query)
     }
 }

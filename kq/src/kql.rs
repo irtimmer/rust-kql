@@ -9,7 +9,8 @@ use datafusion::logical_expr::{TableSource, AggregateUDF, ScalarUDF, LogicalPlan
 
 use datafusion_kql::planner::{KqlToRel, ContextProvider};
 
-use kqlparser::parser::parse_query;
+use kqlparser::ast::Statement;
+use kqlparser::parser::parse;
 
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -44,8 +45,17 @@ pub async fn execute_kql(state: &SessionState, query: &str) -> Result<LogicalPla
     }
 
     let kql = KqlToRel::new(&provider);
-    let query = parse_query(&query).unwrap().1;
-    kql.query_to_plan(query)
+    let query = parse(&query).unwrap().1;
+    let mut plan = None;
+    for stmt in &query {
+        match stmt {
+            Statement::TabularExpression(query) => {
+                plan = Some(kql.query_to_plan(query)?);
+            },
+            _ => (),
+        }
+    }
+    plan.ok_or(DataFusionError::Plan("No query found".to_string()))
 }
 
 impl<'a> ContextProvider for SessionContextProvider<'a> {
