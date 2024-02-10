@@ -259,22 +259,22 @@ pub fn expr(i: &str) -> IResult<&str, Expr> {
 }
 
 fn as_operator(i: &str) -> IResult<&str, (Options, String)> {
-    preceded(terminated(tag_no_case("as"), multispace1), map(
+    preceded(terminated(tag("as"), multispace1), map(
         pair(opt(terminated(options, multispace1)), identifier),
         |(o, a)| (o.unwrap_or_default(), a)
     ))(i)
 }
 
 fn consume_operator(i: &str) -> IResult<&str, Options> {
-    preceded(tag_no_case("consume"), options)(i)
+    preceded(tag("consume"), options)(i)
 }
 
 fn count_operator(i: &str) -> IResult<&str, ()> {
-    map(tag_no_case("count"), |_| ())(i)
+    map(tag("count"), |_| ())(i)
 }
 
 fn datatable_operator(i: &str) -> IResult<&str, (Vec<(String, Type)>, Vec<Expr>)> {
-    preceded(terminated(tag_no_case("datatable"), multispace1), separated_pair(
+    preceded(terminated(tag("datatable"), multispace1), separated_pair(
         delimited(tag("("), type_mapping, tag(")")),
         multispace0,
         delimited(tag("["), separated_list1(tag(","), trim(expr)), tag("]"))
@@ -282,14 +282,14 @@ fn datatable_operator(i: &str) -> IResult<&str, (Vec<(String, Type)>, Vec<Expr>)
 }
 
 fn distinct_operator(i: &str) -> IResult<&str, Vec<String>> {
-    preceded(terminated(tag_no_case("distinct"), multispace1), separated_list1(
+    preceded(terminated(tag("distinct"), multispace1), separated_list1(
         tag(","),
         trim(identifier)
     ))(i)
 }
 
 fn evaluate_operator(i: &str) -> IResult<&str, (Options, String, Vec<Expr>)> {
-    preceded(terminated(tag_no_case("evaluate"), multispace1), tuple((
+    preceded(terminated(tag("evaluate"), multispace1), tuple((
         terminated(options, multispace1),
         terminated(identifier, multispace0),
         delimited(tag("("), separated_list0(tag(","), trim(expr)), tag(")"))
@@ -297,14 +297,14 @@ fn evaluate_operator(i: &str) -> IResult<&str, (Options, String, Vec<Expr>)> {
 }
 
 fn extend_operator(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
-    preceded(terminated(tag_no_case("extend"), multispace1), separated_list0(
+    preceded(terminated(tag("extend"), multispace1), separated_list0(
         tuple((multispace0, tag(","), multispace0)),
         map(separated_pair(identifier, trim(tag("=")), expr), |(n, e)| (Some(n), e)),
     ))(i)
 }
 
 fn externaldata_operator(i: &str) -> IResult<&str, (Vec<(String, Type)>, Vec<String>)> {
-    preceded(terminated(tag_no_case("externaldata"), multispace1), separated_pair(
+    preceded(terminated(tag("externaldata"), multispace1), separated_pair(
         delimited(tag("("), type_mapping, tag(")")),
         multispace0,
         delimited(tag("["), separated_list1(tag(","), trim(string)), tag("]"))
@@ -312,7 +312,7 @@ fn externaldata_operator(i: &str) -> IResult<&str, (Vec<(String, Type)>, Vec<Str
 }
 
 fn facet_operator(i: &str) -> IResult<&str, (Vec<String>, Vec<Operator>)> {
-    preceded(terminated(separated_pair(tag_no_case("facet"), multispace1, tag_no_case("by")), multispace1), pair(
+    preceded(terminated(separated_pair(tag("facet"), multispace1, tag_no_case("by")), multispace1), pair(
         separated_list0(tag(","), trim(identifier)),
         map(opt(preceded(terminated(tag("with"), multispace0), delimited(
             tag("("),
@@ -323,7 +323,7 @@ fn facet_operator(i: &str) -> IResult<&str, (Vec<String>, Vec<Operator>)> {
 }
 
 fn find_operator(i: &str) -> IResult<&str, (Options, (Option<Vec<Source>>, Expr), FindProjection)> {
-    preceded(terminated(tag_no_case("find"), multispace1), tuple((
+    preceded(terminated(tag("find"), multispace1), tuple((
         terminated(options, multispace0),
         alt((
             map(separated_pair(
@@ -344,7 +344,7 @@ fn find_operator(i: &str) -> IResult<&str, (Options, (Option<Vec<Source>>, Expr)
 }
 
 fn fork_operator(i: &str) -> IResult<&str, Vec<(Option<String>, Vec<Operator>)>> {
-    preceded(terminated(tag_no_case("fork"), multispace1), separated_list1(
+    preceded(terminated(tag("fork"), multispace1), separated_list1(
         tag(","),
         trim(alt((
             map(separated_pair(
@@ -358,11 +358,11 @@ fn fork_operator(i: &str) -> IResult<&str, Vec<(Option<String>, Vec<Operator>)>>
 }
 
 fn getschema_operator(i: &str) -> IResult<&str, ()> {
-    map(terminated(tag_no_case("getschema"), multispace1), |_| ())(i)
+    map(terminated(tag("getschema"), multispace1), |_| ())(i)
 }
 
 fn join_operator(i: &str) -> IResult<&str, (Options, TabularExpression, Vec<String>)> {
-    preceded(terminated(tag_no_case("join"), multispace1), tuple((
+    preceded(terminated(tag("join"), multispace1), tuple((
         terminated(options, multispace0),
         terminated(delimited(tag("("), parse_query, tag(")")), multispace0),
         preceded(
@@ -373,7 +373,7 @@ fn join_operator(i: &str) -> IResult<&str, (Options, TabularExpression, Vec<Stri
 }
 
 fn lookup_operator(i: &str) -> IResult<&str, (Options, TabularExpression, Vec<String>)> {
-    preceded(terminated(tag_no_case("lookup"), multispace1), tuple((
+    preceded(terminated(tag("lookup"), multispace1), tuple((
         terminated(options, multispace0),
         terminated(delimited(tag("("), parse_query, tag(")")), multispace0),
         preceded(
@@ -384,7 +384,7 @@ fn lookup_operator(i: &str) -> IResult<&str, (Options, TabularExpression, Vec<St
 }
 
 fn mv_apply_operator(i: &str) -> IResult<&str, (Vec<((String, String), Option<Type>)>, Vec<Operator>)> {
-    preceded(terminated(tag_no_case("mv-apply"), multispace1), tuple((
+    preceded(terminated(tag("mv-apply"), multispace1), tuple((
         separated_list1(tag(","), trim(pair(
             separated_pair(trim(identifier), tag("="), trim(identifier)),
             opt(preceded(
@@ -400,11 +400,11 @@ fn mv_apply_operator(i: &str) -> IResult<&str, (Vec<((String, String), Option<Ty
 }
 
 fn mv_expand_operator(i: &str) -> IResult<&str, String> {
-    preceded(terminated(tag_no_case("mv-expand"), multispace1), identifier)(i)
+    preceded(terminated(tag("mv-expand"), multispace1), identifier)(i)
 }
 
 fn parse_operator(i: &str) -> IResult<&str, (Options, Expr, Vec<PatternToken>)> {
-    preceded(terminated(tag_no_case("parse"), multispace1), tuple((
+    preceded(terminated(tag("parse"), multispace1), tuple((
         terminated(options, multispace0),
         terminated(expr, multispace0),
         preceded(terminated(tag("with"), multispace1), pattern)
@@ -412,7 +412,7 @@ fn parse_operator(i: &str) -> IResult<&str, (Options, Expr, Vec<PatternToken>)> 
 }
 
 fn parse_where_operator(i: &str) -> IResult<&str, (Options, Expr, Vec<PatternToken>)> {
-    preceded(terminated(tag_no_case("parse-where"), multispace1), tuple((
+    preceded(terminated(tag("parse-where"), multispace1), tuple((
         terminated(options, multispace0),
         terminated(expr, multispace0),
         preceded(terminated(tag("with"), multispace1), pattern)
@@ -420,14 +420,14 @@ fn parse_where_operator(i: &str) -> IResult<&str, (Options, Expr, Vec<PatternTok
 }
 
 fn print_operator(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
-    preceded(terminated(tag_no_case("print"), multispace0), separated_list0(
+    preceded(terminated(tag("print"), multispace0), separated_list0(
         trim(tag(",")),
         map(separated_pair(identifier, trim(tag("=")), expr), |(n, e)| (Some(n), e)),
     ))(i)
 }
 
 fn project_operator(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
-    preceded(terminated(tag_no_case("project"), multispace1), separated_list0(
+    preceded(terminated(tag("project"), multispace1), separated_list0(
         tag(","),
         trim(alt((
             map(separated_pair(identifier, trim(tag("=")), expr), |(n, e)| (Some(n), e)),
@@ -437,28 +437,28 @@ fn project_operator(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
 }
 
 fn project_away_operator(i: &str) -> IResult<&str, Vec<String>> {
-    preceded(terminated(tag_no_case("project-away"), multispace1), separated_list1(
+    preceded(terminated(tag("project-away"), multispace1), separated_list1(
         tag(","),
         trim(identifier)
     ))(i)
 }
 
 fn project_keep_operator(i: &str) -> IResult<&str, Vec<String>> {
-    preceded(terminated(tag_no_case("project-keep"), multispace1), separated_list1(
+    preceded(terminated(tag("project-keep"), multispace1), separated_list1(
         tag(","),
         trim(identifier)
     ))(i)
 }
 
 fn project_rename_operator(i: &str) -> IResult<&str, Vec<(String, String)>> {
-    preceded(terminated(tag_no_case("project-rename"), multispace1), separated_list1(
+    preceded(terminated(tag("project-rename"), multispace1), separated_list1(
         tag(","),
         separated_pair(trim(identifier), tag("="), trim(identifier))
     ))(i)
 }
 
 fn project_reorder_operator(i: &str) -> IResult<&str, Vec<(String, Option<(bool, bool)>)>> {
-    preceded(terminated(tag_no_case("project-reorder"), multispace1), separated_list1(
+    preceded(terminated(tag("project-reorder"), multispace1), separated_list1(
         tag(","),
         trim(pair(wildcard_identifier, opt(preceded(multispace1, alt((
             value((true, false), tag("asc")),
@@ -470,38 +470,38 @@ fn project_reorder_operator(i: &str) -> IResult<&str, Vec<(String, Option<(bool,
 }
 
 fn where_operator(i: &str) -> IResult<&str, Expr> {
-    preceded(terminated(tag_no_case("where"), multispace1), expr)(i)
+    preceded(terminated(tag("where"), multispace1), expr)(i)
 }
 
 fn range_operator(i: &str) -> IResult<&str, (String, Expr, Expr, Expr)> {
-    preceded(terminated(tag_no_case("range"), multispace1), tuple((
+    preceded(terminated(tag("range"), multispace1), tuple((
         terminated(identifier, multispace1),
-        terminated(preceded(terminated(tag_no_case("from"), multispace1), expr), multispace1),
-        terminated(preceded(terminated(tag_no_case("to"), multispace1), expr), multispace1),
-        preceded(terminated(tag_no_case("step"), multispace1), expr)
+        terminated(preceded(terminated(tag("from"), multispace1), expr), multispace1),
+        terminated(preceded(terminated(tag("to"), multispace1), expr), multispace1),
+        preceded(terminated(tag("step"), multispace1), expr)
     )))(i)
 }
 
 fn sample_operator(i: &str) -> IResult<&str, u32> {
     preceded(
-        terminated(tag_no_case("sample"), multispace1),
+        terminated(tag("sample"), multispace1),
         map(digit1, |x| FromStr::from_str(x).unwrap())
     )(i)
 }
 
 fn sample_distinct_operator(i: &str) -> IResult<&str, (u32, String)> {
     preceded(
-        terminated(tag_no_case("sample-distinct"), multispace1),
+        terminated(tag("sample-distinct"), multispace1),
         separated_pair(
             map(digit1, |x| FromStr::from_str(x).unwrap()),
-            delimited(multispace1, tag_no_case("by"), multispace1),
+            delimited(multispace1, tag("by"), multispace1),
             identifier
         )
     )(i)
 }
 
 fn serialize_operator(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
-    preceded(terminated(tag_no_case("serialize"), multispace1), separated_list0(
+    preceded(terminated(tag("serialize"), multispace1), separated_list0(
         tag(","),
         trim(map(
             separated_pair(identifier, trim(tag("=")), expr),
@@ -511,17 +511,17 @@ fn serialize_operator(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
 }
 
 fn summarize_operator(i: &str) -> IResult<&str, (Vec<Expr>, Vec<Expr>)> {
-    preceded(terminated(tag_no_case("summarize"), multispace1), pair(
+    preceded(terminated(tag("summarize"), multispace1), pair(
         separated_list0(tag(","), trim(expr)),
         map(opt(preceded(
-            terminated(tag_no_case("by"), multispace1),
+            terminated(tag("by"), multispace1),
             separated_list1(tag(","), trim(expr))
         )), |b| b.unwrap_or_default())
     ))(i)
 }
 
 fn sort_operator(i: &str) -> IResult<&str, Vec<String>> {
-    preceded(tuple((tag_no_case("sort"), multispace1, tag_no_case("by"))), separated_list1(
+    preceded(tuple((tag("sort"), multispace1, tag("by"))), separated_list1(
         tag(","),
         trim(identifier)
     ))(i)
@@ -529,14 +529,14 @@ fn sort_operator(i: &str) -> IResult<&str, Vec<String>> {
 
 fn take_operator(i: &str) -> IResult<&str, u32> {
     preceded(
-        terminated(alt((tag_no_case("take"), tag_no_case("limit"))), multispace1),
+        terminated(alt((tag("take"), tag("limit"))), multispace1),
         map(digit1, |x| FromStr::from_str(x).unwrap())
     )(i)
 }
 
 fn top_operator(i: &str) -> IResult<&str, (u32, Expr, bool, bool)> {
     map(preceded(
-        terminated(tag_no_case("top"), multispace1),
+        terminated(tag("top"), multispace1),
         tuple((
             terminated(u32, multispace1),
             preceded(terminated(tag("by"), multispace1), trim(expr)),
@@ -553,7 +553,7 @@ fn top_operator(i: &str) -> IResult<&str, (u32, Expr, bool, bool)> {
 }
 
 fn union_operator(i: &str) -> IResult<&str, (Options, Vec<Source>)> {
-    preceded(terminated(tag_no_case("union"), multispace1), tuple((
+    preceded(terminated(tag("union"), multispace1), tuple((
         terminated(options, multispace0),
         separated_list1(trim(tag(",")), alt((
             delimited(tag("("), trim(source), tag(")")),
@@ -628,7 +628,7 @@ pub fn parse_query(i: &str) -> IResult<&str, TabularExpression> {
 
 fn parse_let(i: &str) -> IResult<&str, (String, LetExpression)> {
     preceded(
-        terminated(tag_no_case("let"), multispace1),
+        terminated(tag("let"), multispace1),
         separated_pair(
             trim(identifier),
             tag("="),
