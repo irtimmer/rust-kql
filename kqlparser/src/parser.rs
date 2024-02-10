@@ -361,7 +361,7 @@ fn getschema_operator(i: &str) -> IResult<&str, ()> {
     map(terminated(tag_no_case("getschema"), multispace1), |_| ())(i)
 }
 
-fn join_operator(i: &str) -> IResult<&str, (Options, Query, Vec<String>)> {
+fn join_operator(i: &str) -> IResult<&str, (Options, TabularExpression, Vec<String>)> {
     preceded(terminated(tag_no_case("join"), multispace1), tuple((
         terminated(options, multispace0),
         terminated(delimited(tag("("), parse_query, tag(")")), multispace0),
@@ -372,7 +372,7 @@ fn join_operator(i: &str) -> IResult<&str, (Options, Query, Vec<String>)> {
     )))(i)
 }
 
-fn lookup_operator(i: &str) -> IResult<&str, (Options, Query, Vec<String>)> {
+fn lookup_operator(i: &str) -> IResult<&str, (Options, TabularExpression, Vec<String>)> {
     preceded(terminated(tag_no_case("lookup"), multispace1), tuple((
         terminated(options, multispace0),
         terminated(delimited(tag("("), parse_query, tag(")")), multispace0),
@@ -618,10 +618,34 @@ fn source(i: &str) -> IResult<&str, Source> {
     ))(i)
 }
 
-pub fn parse_query(i: &str) -> IResult<&str, Query> {
+pub fn parse_query(i: &str) -> IResult<&str, TabularExpression> {
     map(separated_pair(source, multispace0, many0(preceded(tag("|"), trim(operator)))),
-    |(source, operators)| Query {
+    |(source, operators)| TabularExpression {
         source,
         operators
     })(i)
+}
+
+fn parse_let(i: &str) -> IResult<&str, (String, LetExpression)> {
+    preceded(
+        terminated(tag_no_case("let"), multispace1),
+        separated_pair(
+            trim(identifier),
+            tag("="),
+            trim(alt((
+                map(expr, |e| LetExpression::Scalar(e)),
+                map(parse_query, |e| LetExpression::Tabular(e)),
+            )))
+        )
+    )(i)
+}
+
+pub fn parse(i: &str) -> IResult<&str, Vec<Statement>> {
+    separated_list1(
+        tag(";"),
+        trim(alt((
+            map(parse_let, |(n, e)| Statement::Let(n, e)),
+            map(parse_query, |e| Statement::TabularExpression(e)),
+        ))),
+    )(i)
 }

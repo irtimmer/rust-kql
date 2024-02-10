@@ -11,7 +11,7 @@ use datafusion_expr::{AggregateUDF, Expr, Literal, ScalarUDF, TableSource};
 
 use itertools::Itertools;
 
-use kqlparser::ast::{Expr as KqlExpr, Operator, Query, Literal as KqlLiteral, Source, Type};
+use kqlparser::ast::{Expr as KqlExpr, Operator, TabularExpression, Literal as KqlLiteral, Source, Type};
 
 use std::collections::HashMap;
 use std::iter;
@@ -68,7 +68,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
         })
     }
 
-    fn query_statement_to_plan(&self, ctx: &mut PlannerContext, query: Query) -> Result<LogicalPlan> {
+    fn query_statement_to_plan(&self, ctx: &mut PlannerContext, query: TabularExpression) -> Result<LogicalPlan> {
         let mut builder = match query.source {
             Source::Datatable(s, d) => LogicalPlanBuilder::from(LogicalPlan::Values(Values {
                 schema: Arc::new(DFSchema::new_with_metadata(s.iter().map(|(n, t)| DFField::new::<TableReference>(None, n, type_to_datatype(t), true)).collect(), HashMap::default()).unwrap()),
@@ -117,7 +117,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
         builder.build()
     }
 
-    pub fn query_to_plan(&self, query: Query) -> Result<LogicalPlan> {
+    pub fn query_to_plan(&self, query: TabularExpression) -> Result<LogicalPlan> {
         self.query_statement_to_plan(&mut PlannerContext::default(), query)
     }
 }

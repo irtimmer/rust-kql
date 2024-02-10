@@ -3,7 +3,13 @@ use std::collections::HashMap;
 pub type Options = HashMap<String, OptionLiteral>;
 
 #[derive(Debug, PartialEq)]
-pub struct Query {
+pub enum Statement {
+    TabularExpression(TabularExpression),
+    Let(String, LetExpression)
+}
+
+#[derive(Debug, PartialEq)]
+pub struct TabularExpression {
     pub source: Source,
     pub operators: Vec<Operator>
 }
@@ -30,8 +36,8 @@ pub enum Operator {
     Facet(Vec<String>, Vec<Operator>),
     Fork(Vec<(Option<String>, Vec<Operator>)>),
     Getschema,
-    Join(Options, Query, Vec<String>),
-    Lookup(Options, Query, Vec<String>),
+    Join(Options, TabularExpression, Vec<String>),
+    Lookup(Options, TabularExpression, Vec<String>),
     MvApply(Vec<((String, String), Option<Type>)>, Vec<Operator>),
     MvExpand(String),
     Parse(Options, Expr, Vec<PatternToken>),
@@ -135,4 +141,10 @@ pub enum PatternToken {
     Wildcard,
     String(String),
     Column(String, Option<Type>),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum LetExpression {
+    Tabular(TabularExpression),
+    Scalar(Expr)
 }
