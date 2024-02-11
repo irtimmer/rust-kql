@@ -1,4 +1,4 @@
-use arrow_schema::DataType;
+use arrow_schema::{DataType, TimeUnit};
 
 use datafusion_common::{TableReference, JoinType, Column, DFSchema, DFField, ScalarValue};
 use datafusion_common::{DataFusionError, Result};
@@ -142,6 +142,7 @@ fn type_to_datatype(t: &Type) -> DataType {
         Type::Int => DataType::Int32,
         Type::Long => DataType::Int64,
         Type::String => DataType::Utf8,
+        Type::Timespan => DataType::Duration(TimeUnit::Nanosecond),
         _ => panic!("Not supported")
     }
 }
@@ -152,6 +153,7 @@ fn literal_to_expr(val: &KqlLiteral) -> Expr {
         KqlLiteral::Int(x) => ScalarValue::from(*x).lit(),
         KqlLiteral::Long(x) => ScalarValue::from(*x).lit(),
         KqlLiteral::String(x) => ScalarValue::from(x.clone()).lit(),
+        KqlLiteral::Timespan(x) => ScalarValue::DurationNanosecond(*x).lit(),
         _ => panic!("Not supported")
     }
 }
