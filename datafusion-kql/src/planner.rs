@@ -111,6 +111,13 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
                     expr
                 }))?,
                 Operator::Where(x) => builder.filter(self.ast_to_expr(ctx, &x)?)?,
+                Operator::Serialize(x) => builder.window(x.iter().map(|(a, b)| {
+                    let mut expr = self.ast_to_expr(ctx, b).unwrap();
+                    if let Some(alias) = a {
+                        expr = expr.alias(alias);
+                    }
+                    expr
+                }))?,
                 Operator::Summarize(x, y) => {
                     let mut ctx1 = ctx.clone();
                     builder.aggregate(y.iter().map(|z| self.ast_to_expr(&mut ctx1, z).unwrap()), x.iter().map(|z| self.ast_to_expr(ctx, z).unwrap()))?
