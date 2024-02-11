@@ -7,7 +7,7 @@ use datafusion_expr::{aggregate_function, AggregateFunction as BuiltinAggregateF
 use datafusion_expr::expr::{AggregateFunction, Sort, ScalarFunction, WindowFunction};
 use datafusion_expr::expr_fn::col;
 use datafusion_expr::logical_plan::{LogicalPlan, LogicalPlanBuilder};
-use datafusion_expr::{AggregateUDF, Expr, Literal, ScalarUDF, TableSource};
+use datafusion_expr::{Expr, Literal, TableSource};
 
 use itertools::Itertools;
 

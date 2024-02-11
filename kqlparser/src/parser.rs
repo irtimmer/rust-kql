@@ -10,7 +10,7 @@ use nom::IResult;
 
 use super::ast::*;
 use super::datetime::{iso8601_datetime, rfc822_datetime, rfc850_datetime};
-use super::{dec_to_i64, decimal, is_kql_identifier, is_kql_wildcard_identifier, take_identifier, trim};
+use super::{dec_to_i64, decimal, is_kql_wildcard_identifier, take_identifier, trim};
 
 fn type_tag(i: &str) -> IResult<&str, Type> {
     alt((
