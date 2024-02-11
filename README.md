@@ -90,8 +90,19 @@ serialize|✅|✅
 summarize|✅|✅
 sort|✅|✅
 take|✅|✅
-top|❌|❌
+top|✅|❌
 top-nested|❌|❌
 top-hitters|❌|❌
 union|✅|❌
 where|✅|✅
+
+### Statements
+Type|Parser|Planner|
+-|-|-|
+alias|❌|❌
+let|✅|❌
+pattern|❌|❌
+query parameters decleration|❌|❌
+restrict|❌|❌
+set|❌|❌
+tabular expression|✅|🚧
