@@ -2,7 +2,7 @@ use std::str::{self, FromStr};
 
 use nom::branch::alt;
 use nom::bytes::complete::{tag, tag_no_case, take_while1, escaped, is_a};
-use nom::character::complete::{digit1, i64, multispace0, multispace1, none_of, one_of, u32, u64, hex_digit1};
+use nom::character::complete::{digit1, i32, i64, multispace0, multispace1, none_of, one_of, u32, u64, hex_digit1};
 use nom::combinator::{map, opt, recognize, value};
 use nom::multi::{many0, separated_list0, separated_list1, fold_many0, many1};
 use nom::sequence::{tuple, preceded, delimited, separated_pair, terminated, pair};
@@ -79,7 +79,7 @@ fn boolean(i: &str) -> IResult<&str, Option<bool>> {
     alt((
         map(tag_no_case("true"), |_| Some(true)),
         map(tag_no_case("false"), |_| Some(false)),
-        map(recognize(pair(opt(tag("-")), digit1)), |x: &str| Some(x.parse::<i32>().unwrap() != 0)),
+        map(i64, |x| Some(x != 0)),
         map(tag("null"), |_| None)
     ))(i)
 }
@@ -112,7 +112,7 @@ fn dynamic(i: &str) -> IResult<&str, Option<Dynamic>> {
         map(terminated(decimal, alt((tag("ticks"), tag("tick")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 100))))),
         map(recognize(tuple((opt(tag("-")), digit1, tag("."), digit1, opt(tuple((tag("e"), opt(tag("-")), digit1)))))), |x: &str| Some(Dynamic::Real(Some(x.parse().unwrap())))),
         map(recognize(tuple((opt(tag("-")), digit1, tag("e"), opt(tag("-")), digit1))), |x: &str| Some(Dynamic::Real(Some(x.parse().unwrap())))),
-        map(digit1, |x| Some(Dynamic::Long(Some(FromStr::from_str(x).unwrap())))),
+        map(i64, |x| Some(Dynamic::Long(Some(x)))),
         map(string, |s| Some(Dynamic::String(s))),
         alt((
             value(Some(Dynamic::Bool(Some(true))), tag("true")),
@@ -125,7 +125,7 @@ fn dynamic(i: &str) -> IResult<&str, Option<Dynamic>> {
 fn integer(i: &str) -> IResult<&str, Option<i32>> {
     alt((
         map(preceded(tag_no_case("0x"), hex_digit1), |x| Some(i32::from_str_radix(x, 16).unwrap())),
-        map(recognize(pair(opt(tag("-")), digit1)), |x: &str| Some(x.parse().unwrap())),
+        map(i32, |x| Some(x)),
         map(tag("null"), |_| None)
     ))(i)
 }
@@ -133,7 +133,7 @@ fn integer(i: &str) -> IResult<&str, Option<i32>> {
 fn long(i: &str) -> IResult<&str, Option<i64>> {
     alt((
         map(preceded(tag_no_case("0x"), hex_digit1), |x| Some(i64::from_str_radix(x, 16).unwrap())),
-        map(recognize(pair(opt(tag("-")), digit1)), |x: &str| Some(x.parse().unwrap())),
+        map(i64, |x| Some(x)),
         map(tag("null"), |_| None)
     ))(i)
 }
@@ -188,7 +188,7 @@ fn literal(i: &str) -> IResult<&str, Literal> {
         map(terminated(decimal, alt((tag("ticks"), tag("tick")))), |x| Literal::Timespan(Some(dec_to_i64(x, 100)))),
         map(recognize(tuple((opt(tag("-")), digit1, tag("."), digit1, opt(tuple((tag("e"), opt(tag("-")), digit1)))))), |x: &str| Literal::Real(Some(x.parse().unwrap()))),
         map(recognize(tuple((opt(tag("-")), digit1, tag("e"), opt(tag("-")), digit1))), |x: &str| Literal::Real(Some(x.parse().unwrap()))),
-        map(digit1, |x| Literal::Long(Some(FromStr::from_str(x).unwrap()))),
+        map(i64, |x| Literal::Long(Some(x))),
         map(string, |s| Literal::String(s)),
         map(tag("true"), |_| Literal::Bool(Some(true))),
         map(tag("false"), |_| Literal::Bool(Some(false))),
@@ -504,7 +504,7 @@ fn range_operator(i: &str) -> IResult<&str, (String, Expr, Expr, Expr)> {
 fn sample_operator(i: &str) -> IResult<&str, u32> {
     preceded(
         terminated(tag("sample"), multispace1),
-        map(digit1, |x| FromStr::from_str(x).unwrap())
+        u32
     )(i)
 }
 
@@ -512,7 +512,7 @@ fn sample_distinct_operator(i: &str) -> IResult<&str, (u32, String)> {
     preceded(
         terminated(tag("sample-distinct"), multispace1),
         separated_pair(
-            map(digit1, |x| FromStr::from_str(x).unwrap()),
+            u32,
             delimited(multispace1, tag("by"), multispace1),
             identifier
         )
@@ -549,7 +549,7 @@ fn sort_operator(i: &str) -> IResult<&str, Vec<String>> {
 fn take_operator(i: &str) -> IResult<&str, u32> {
     preceded(
         terminated(alt((tag("take"), tag("limit"))), multispace1),
-        map(digit1, |x| FromStr::from_str(x).unwrap())
+        u32
     )(i)
 }
 
