@@ -96,6 +96,7 @@ pub enum Literal {
     Dynamic(Option<Dynamic>),
     Int(Option<i32>),
     Long(Option<i64>),
+    Real(Option<f32>),
     String(String),
     Timespan(Option<i64>)
 }
@@ -126,6 +127,7 @@ pub enum Dynamic {
     Dictionary(HashMap<String, Option<Dynamic>>),
     Int(Option<i32>),
     Long(Option<i64>),
+    Real(Option<f32>),
     String(String),
     Timespan(Option<i64>)
 }

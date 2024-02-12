@@ -110,11 +110,15 @@ fn dynamic(i: &str) -> IResult<&str, Option<Dynamic>> {
         map(terminated(decimal, alt((tag("milliseconds"), tag("millisecond"), tag("milli"), tag("ms")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000 * 1000))))),
         map(terminated(decimal, alt((tag("microseconds"), tag("microsecond"), tag("micro")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000))))),
         map(terminated(decimal, alt((tag("ticks"), tag("tick")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 100))))),
+        map(recognize(tuple((opt(tag("-")), digit1, tag("."), digit1, opt(tuple((tag("e"), opt(tag("-")), digit1)))))), |x: &str| Some(Dynamic::Real(Some(x.parse().unwrap())))),
+        map(recognize(tuple((opt(tag("-")), digit1, tag("e"), opt(tag("-")), digit1))), |x: &str| Some(Dynamic::Real(Some(x.parse().unwrap())))),
         map(digit1, |x| Some(Dynamic::Long(Some(FromStr::from_str(x).unwrap())))),
         map(string, |s| Some(Dynamic::String(s))),
-        value(Some(Dynamic::Bool(Some(true))), tag("true")),
-        value(Some(Dynamic::Bool(Some(false))), tag("false")),
-        value(None, tag("null"))
+        alt((
+            value(Some(Dynamic::Bool(Some(true))), tag("true")),
+            value(Some(Dynamic::Bool(Some(false))), tag("false")),
+            value(None, tag("null"))
+        ))
     ))(i)
 }
 
@@ -131,6 +135,16 @@ fn long(i: &str) -> IResult<&str, Option<i64>> {
         map(preceded(tag_no_case("0x"), hex_digit1), |x| Some(i64::from_str_radix(x, 16).unwrap())),
         map(recognize(pair(opt(tag("-")), digit1)), |x: &str| Some(x.parse().unwrap())),
         map(tag("null"), |_| None)
+    ))(i)
+}
+
+fn real(i: &str) -> IResult<&str, Option<f32>> {
+    alt((
+        map(recognize(tuple((opt(tag("-")), digit1, opt(pair(tag("."), digit1)), opt(tuple((tag("e"), opt(tag("-")), digit1)))))), |x: &str| Some(x.parse().unwrap())),
+        value(Some(f32::INFINITY), tag("+inf")),
+        value(Some(f32::INFINITY), tag("-inf")),
+        value(Some(f32::NAN), tag("nan")),
+        value(None, tag("null")),
     ))(i)
 }
 
@@ -162,9 +176,8 @@ fn literal(i: &str) -> IResult<&str, Literal> {
         map(preceded(tag("dynamic"), delimited(tag("("), trim(dynamic), tag(")"))), |x| Literal::Dynamic(x)),
         map(preceded(tag("int"), delimited(tag("("), trim(integer), tag(")"))), |x| Literal::Int(x)),
         map(preceded(tag("long"), delimited(tag("("), trim(long), tag(")"))), |x| Literal::Long(x)),
+        map(preceded(tag("real"), delimited(tag("("), trim(real), tag(")"))), |x| Literal::Real(x)),
         map(preceded(alt((tag("timespan"), tag("time"))), delimited(tag("("), trim(timespan), tag(")"))), |x| Literal::Timespan(x)),
-        map(tag("true"), |_| Literal::Bool(Some(true))),
-        map(tag("false"), |_| Literal::Bool(Some(false))),
         map(preceded(tag_no_case("0x"), hex_digit1), |x| Literal::Long(Some(i64::from_str_radix(x, 16).unwrap()))),
         map(terminated(decimal, alt((tag("days"), tag("day"), tag("d")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60 * 24)))),
         map(terminated(decimal, alt((tag("hours"), tag("hour"), tag("h")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60)))),
@@ -173,8 +186,12 @@ fn literal(i: &str) -> IResult<&str, Literal> {
         map(terminated(decimal, alt((tag("milliseconds"), tag("millisecond"), tag("milli"), tag("ms")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000 * 1000)))),
         map(terminated(decimal, alt((tag("microseconds"), tag("microsecond"), tag("micro")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000)))),
         map(terminated(decimal, alt((tag("ticks"), tag("tick")))), |x| Literal::Timespan(Some(dec_to_i64(x, 100)))),
+        map(recognize(tuple((opt(tag("-")), digit1, tag("."), digit1, opt(tuple((tag("e"), opt(tag("-")), digit1)))))), |x: &str| Literal::Real(Some(x.parse().unwrap()))),
+        map(recognize(tuple((opt(tag("-")), digit1, tag("e"), opt(tag("-")), digit1))), |x: &str| Literal::Real(Some(x.parse().unwrap()))),
         map(digit1, |x| Literal::Long(Some(FromStr::from_str(x).unwrap()))),
         map(string, |s| Literal::String(s)),
+        map(tag("true"), |_| Literal::Bool(Some(true))),
+        map(tag("false"), |_| Literal::Bool(Some(false))),
     ))(i)
 }
 

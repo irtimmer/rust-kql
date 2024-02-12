@@ -45,7 +45,7 @@ dynamic|✅|❌
 guid|❌|❌
 int|✅|✅
 long|✅|✅
-real|❌|❌
+real|✅|❌
 string|✅|✅
 timespan|✅|✅
 
