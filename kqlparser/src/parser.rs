@@ -110,6 +110,8 @@ fn dynamic(i: &str) -> IResult<&str, Option<Dynamic>> {
         map(terminated(decimal, alt((tag("milliseconds"), tag("millisecond"), tag("milli"), tag("ms")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000 * 1000))))),
         map(terminated(decimal, alt((tag("microseconds"), tag("microsecond"), tag("micro")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000))))),
         map(terminated(decimal, alt((tag("ticks"), tag("tick")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 100))))),
+        map(digit1, |x| Some(Dynamic::Long(Some(FromStr::from_str(x).unwrap())))),
+        map(string, |s| Some(Dynamic::String(s))),
         value(Some(Dynamic::Bool(Some(true))), tag("true")),
         value(Some(Dynamic::Bool(Some(false))), tag("false")),
         value(None, tag("null"))
