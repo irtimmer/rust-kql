@@ -40,7 +40,7 @@ Type|Parser|Planner|
 -|-|-|
 bool|✅|✅
 datetime|✅|❌
-decimal|❌|❌
+decimal|🚧[^1]|❌
 dynamic|✅|❌
 guid|❌|❌
 int|✅|✅
@@ -48,6 +48,8 @@ long|✅|✅
 real|✅|❌
 string|✅|✅
 timespan|✅|✅
+
+[^1]: Parsed as 64-bit floating number instead of 128-bit
 
 ### Operators
 

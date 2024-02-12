@@ -10,7 +10,7 @@ use nom::IResult;
 
 use super::ast::*;
 use super::datetime::{iso8601_datetime, rfc822_datetime, rfc850_datetime};
-use super::{dec_to_i64, decimal, is_kql_wildcard_identifier, take_identifier, trim};
+use super::{dec_to_i64, decimal_number, is_kql_wildcard_identifier, take_identifier, trim};
 
 fn type_tag(i: &str) -> IResult<&str, Type> {
     alt((
@@ -93,23 +93,34 @@ fn date(i: &str) -> IResult<&str, Option<DateTime>> {
     ))(i)
 }
 
+fn decimal(i: &str) -> IResult<&str, Option<f64>> {
+    alt((
+        map(recognize(tuple((opt(tag("-")), digit1, opt(pair(tag("."), digit1)), opt(tuple((tag("e"), opt(tag("-")), digit1)))))), |x: &str| Some(x.parse().unwrap())),
+        value(Some(f64::INFINITY), tag("+inf")),
+        value(Some(f64::INFINITY), tag("-inf")),
+        value(Some(f64::NAN), tag("nan")),
+        value(None, tag("null")),
+    ))(i)
+}
+
 fn dynamic(i: &str) -> IResult<&str, Option<Dynamic>> {
     alt((
         map(delimited(tag("["), separated_list0(tag(","), trim(dynamic)), tag("]")), |x| Some(Dynamic::Array(x))),
         map(delimited(tag("{"), separated_list0(tag(","), separated_pair(trim(string), tag(":"), trim(dynamic))), tag("}")), |x| Some(Dynamic::Dictionary(x.into_iter().collect()))),
         map(preceded(tag("bool"), delimited(tag("("), trim(boolean), tag(")"))), |x| Some(Dynamic::Bool(x))),
         map(preceded(tag("datetime"), delimited(tag("("), trim(date), tag(")"))), |x| Some(Dynamic::DateTime(x))),
+        map(preceded(tag("decimal"), delimited(tag("("), trim(decimal), tag(")"))), |x| Some(Dynamic::Decimal(x))),
         map(preceded(tag("int"), delimited(tag("("), trim(integer), tag(")"))), |x| Some(Dynamic::Int(x))),
         map(preceded(tag("long"), delimited(tag("("), trim(long), tag(")"))), |x| Some(Dynamic::Long(x))),
         map(preceded(alt((tag("timespan"), tag("time"))), delimited(tag("("), trim(timespan), tag(")"))), |x| Some(Dynamic::Timespan(x))),
         map(preceded(tag_no_case("0x"), hex_digit1), |x| Some(Dynamic::Long(Some(i64::from_str_radix(x, 16).unwrap())))),
-        map(terminated(decimal, alt((tag("days"), tag("day"), tag("d")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60 * 24))))),
-        map(terminated(decimal, alt((tag("hours"), tag("hour"), tag("h")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60))))),
-        map(terminated(decimal, alt((tag("minutes"), tag("minute"), tag("m")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60))))),
-        map(terminated(decimal, alt((tag("seconds"), tag("second"), tag("s")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000))))),
-        map(terminated(decimal, alt((tag("milliseconds"), tag("millisecond"), tag("milli"), tag("ms")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000 * 1000))))),
-        map(terminated(decimal, alt((tag("microseconds"), tag("microsecond"), tag("micro")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000))))),
-        map(terminated(decimal, alt((tag("ticks"), tag("tick")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 100))))),
+        map(terminated(decimal_number, alt((tag("days"), tag("day"), tag("d")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60 * 24))))),
+        map(terminated(decimal_number, alt((tag("hours"), tag("hour"), tag("h")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60))))),
+        map(terminated(decimal_number, alt((tag("minutes"), tag("minute"), tag("m")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60))))),
+        map(terminated(decimal_number, alt((tag("seconds"), tag("second"), tag("s")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000))))),
+        map(terminated(decimal_number, alt((tag("milliseconds"), tag("millisecond"), tag("milli"), tag("ms")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000 * 1000))))),
+        map(terminated(decimal_number, alt((tag("microseconds"), tag("microsecond"), tag("micro")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 1000))))),
+        map(terminated(decimal_number, alt((tag("ticks"), tag("tick")))), |x| Some(Dynamic::Timespan(Some(dec_to_i64(x, 100))))),
         map(recognize(tuple((opt(tag("-")), digit1, tag("."), digit1, opt(tuple((tag("e"), opt(tag("-")), digit1)))))), |x: &str| Some(Dynamic::Real(Some(x.parse().unwrap())))),
         map(recognize(tuple((opt(tag("-")), digit1, tag("e"), opt(tag("-")), digit1))), |x: &str| Some(Dynamic::Real(Some(x.parse().unwrap())))),
         map(i64, |x| Some(Dynamic::Long(Some(x)))),
@@ -150,19 +161,19 @@ fn real(i: &str) -> IResult<&str, Option<f32>> {
 
 fn timespan(i: &str) -> IResult<&str, Option<i64>> {
     alt((
-        map(terminated(decimal, pair(multispace0, alt((tag("days"), tag("day"), tag("d"))))), |x| Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60 * 24))),
-        map(terminated(decimal, pair(multispace0, alt((tag("hours"), tag("hour"), tag("h"))))), |x| Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60))),
-        map(terminated(decimal, pair(multispace0, alt((tag("minutes"), tag("minute"), tag("m"))))), |x| Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60))),
-        map(terminated(decimal, pair(multispace0, alt((tag("seconds"), tag("second"), tag("s"))))), |x| Some(dec_to_i64(x, 1000 * 1000 * 1000))),
-        map(terminated(decimal, pair(multispace0, alt((tag("milliseconds"), tag("millisecond"), tag("milli"), tag("ms"))))), |x| Some(dec_to_i64(x, 1000 * 1000))),
-        map(terminated(decimal, pair(multispace0, alt((tag("microseconds"), tag("microsecond"), tag("micro"))))), |x| Some(dec_to_i64(x, 1000))),
-        map(terminated(decimal, pair(multispace0, alt((tag("ticks"), tag("tick"))))), |x| Some(dec_to_i64(x, 100))),
+        map(terminated(decimal_number, pair(multispace0, alt((tag("days"), tag("day"), tag("d"))))), |x| Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60 * 24))),
+        map(terminated(decimal_number, pair(multispace0, alt((tag("hours"), tag("hour"), tag("h"))))), |x| Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60))),
+        map(terminated(decimal_number, pair(multispace0, alt((tag("minutes"), tag("minute"), tag("m"))))), |x| Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60))),
+        map(terminated(decimal_number, pair(multispace0, alt((tag("seconds"), tag("second"), tag("s"))))), |x| Some(dec_to_i64(x, 1000 * 1000 * 1000))),
+        map(terminated(decimal_number, pair(multispace0, alt((tag("milliseconds"), tag("millisecond"), tag("milli"), tag("ms"))))), |x| Some(dec_to_i64(x, 1000 * 1000))),
+        map(terminated(decimal_number, pair(multispace0, alt((tag("microseconds"), tag("microsecond"), tag("micro"))))), |x| Some(dec_to_i64(x, 1000))),
+        map(terminated(decimal_number, pair(multispace0, alt((tag("ticks"), tag("tick"))))), |x| Some(dec_to_i64(x, 100))),
         map(
-            tuple((separated_pair(i64, tag("."), separated_pair(u64, tag(":"), u64)), opt(preceded(tag(":"), decimal)))),
+            tuple((separated_pair(i64, tag("."), separated_pair(u64, tag(":"), u64)), opt(preceded(tag(":"), decimal_number)))),
             |((d, (h, m)), s)| Some(((d * 24 + h as i64) * 60 + m as i64) * (1000 * 1000 * 1000 * 60) + s.map(|x| dec_to_i64(x, 1000 * 1000 * 1000)).unwrap_or(0) as i64)
         ),
         map(
-            tuple((separated_pair(u64, tag(":"), u64), opt(preceded(tag(":"), decimal)))),
+            tuple((separated_pair(u64, tag(":"), u64), opt(preceded(tag(":"), decimal_number)))),
             |((h, m), s)| Some((h as i64 * 60 + m as i64) * (1000 * 1000 * 1000 * 60) + s.map(|x| dec_to_i64(x, 1000 * 1000 * 1000)).unwrap_or(0) as i64)
         ),
         map(tag("null"), |_| None)
@@ -179,13 +190,13 @@ fn literal(i: &str) -> IResult<&str, Literal> {
         map(preceded(tag("real"), delimited(tag("("), trim(real), tag(")"))), |x| Literal::Real(x)),
         map(preceded(alt((tag("timespan"), tag("time"))), delimited(tag("("), trim(timespan), tag(")"))), |x| Literal::Timespan(x)),
         map(preceded(tag_no_case("0x"), hex_digit1), |x| Literal::Long(Some(i64::from_str_radix(x, 16).unwrap()))),
-        map(terminated(decimal, alt((tag("days"), tag("day"), tag("d")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60 * 24)))),
-        map(terminated(decimal, alt((tag("hours"), tag("hour"), tag("h")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60)))),
-        map(terminated(decimal, alt((tag("minutes"), tag("minute"), tag("m")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60)))),
-        map(terminated(decimal, alt((tag("seconds"), tag("second"), tag("s")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000)))),
-        map(terminated(decimal, alt((tag("milliseconds"), tag("millisecond"), tag("milli"), tag("ms")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000 * 1000)))),
-        map(terminated(decimal, alt((tag("microseconds"), tag("microsecond"), tag("micro")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000)))),
-        map(terminated(decimal, alt((tag("ticks"), tag("tick")))), |x| Literal::Timespan(Some(dec_to_i64(x, 100)))),
+        map(terminated(decimal_number, alt((tag("days"), tag("day"), tag("d")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60 * 24)))),
+        map(terminated(decimal_number, alt((tag("hours"), tag("hour"), tag("h")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60 * 60)))),
+        map(terminated(decimal_number, alt((tag("minutes"), tag("minute"), tag("m")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000 * 60)))),
+        map(terminated(decimal_number, alt((tag("seconds"), tag("second"), tag("s")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000 * 1000 * 1000)))),
+        map(terminated(decimal_number, alt((tag("milliseconds"), tag("millisecond"), tag("milli"), tag("ms")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000 * 1000)))),
+        map(terminated(decimal_number, alt((tag("microseconds"), tag("microsecond"), tag("micro")))), |x| Literal::Timespan(Some(dec_to_i64(x, 1000)))),
+        map(terminated(decimal_number, alt((tag("ticks"), tag("tick")))), |x| Literal::Timespan(Some(dec_to_i64(x, 100)))),
         map(recognize(tuple((opt(tag("-")), digit1, tag("."), digit1, opt(tuple((tag("e"), opt(tag("-")), digit1)))))), |x: &str| Literal::Real(Some(x.parse().unwrap()))),
         map(recognize(tuple((opt(tag("-")), digit1, tag("e"), opt(tag("-")), digit1))), |x: &str| Literal::Real(Some(x.parse().unwrap()))),
         map(i64, |x| Literal::Long(Some(x))),

@@ -93,6 +93,7 @@ pub enum Type {
 pub enum Literal {
     Bool(Option<bool>),
     DateTime(Option<DateTime>),
+    Decimal(Option<f64>),
     Dynamic(Option<Dynamic>),
     Int(Option<i32>),
     Long(Option<i64>),
@@ -124,6 +125,7 @@ pub enum Dynamic {
     Array(Vec<Option<Dynamic>>),
     Bool(Option<bool>),
     DateTime(Option<DateTime>),
+    Decimal(Option<f64>),
     Dictionary(HashMap<String, Option<Dynamic>>),
     Int(Option<i32>),
     Long(Option<i64>),

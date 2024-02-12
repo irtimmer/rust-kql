@@ -32,7 +32,7 @@ pub fn take_identifier(i: &str) -> IResult<&str, &str> {
     Ok((input, identifier))
 }
 
-pub fn decimal(i: &str) -> IResult<&str, Decimal> {
+pub fn decimal_number(i: &str) -> IResult<&str, Decimal> {
     pair(i64, opt(preceded(tag("."), map(consumed(u64::<&str, _>), |(i, x)| (i.len(), x)))))(i)
 }
 
