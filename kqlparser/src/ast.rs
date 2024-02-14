@@ -83,9 +83,11 @@ pub enum Expr {
 pub enum Type {
     Bool,
     DateTime,
+    Decimal,
     Dynamic,
     Int,
     Long,
+    Real,
     String,
     Timespan
 }

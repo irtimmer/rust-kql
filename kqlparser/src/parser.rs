@@ -16,9 +16,11 @@ fn type_tag(i: &str) -> IResult<&str, Type> {
     alt((
         map(tag("bool"), |_| Type::Bool),
         value(Type::DateTime, alt((tag("datetime"), tag("date")))),
+        value(Type::Decimal, tag("decimal")),
         value(Type::Dynamic, tag("dynamic")),
         map(tag("int"), |_| Type::Int),
         map(tag("long"), |_| Type::Long),
+        value(Type::Real, tag("real")),
         map(tag("string"), |_| Type::String),
         map(tag("timespan"), |_| Type::Timespan),
     ))(i)
