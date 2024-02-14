@@ -33,11 +33,28 @@ fn option_literal(i: &str) -> IResult<&str, OptionLiteral> {
     ))(i)
 }
 
+fn option_quoted_literal(i: &str) -> IResult<&str, OptionLiteral> {
+    alt((
+        value(OptionLiteral::Bool(true), tag("true")),
+        value(OptionLiteral::Bool(false), tag("false")),
+        map(i64, |x| OptionLiteral::Long(x)),
+        map(string, |s| OptionLiteral::String(s))
+    ))(i)
+}
+
 fn options(i: &str) -> IResult<&str, Options> {
     map(separated_list0(multispace1, separated_pair(
         identifier,
         trim(tag("=")),
         option_literal
+    )), |x| x.into_iter().collect())(i)
+}
+
+fn options_with_comma_and_quoted(i: &str) -> IResult<&str, Options> {
+    map(separated_list0(tag(","), separated_pair(
+        trim(identifier),
+        tag("="),
+        trim(option_quoted_literal)
     )), |x| x.into_iter().collect())(i)
 }
 
@@ -449,6 +466,14 @@ fn parse_where_operator(i: &str) -> IResult<&str, (Options, Expr, Vec<PatternTok
     )))(i)
 }
 
+fn parse_kv_operator(i: &str) -> IResult<&str, (Expr, Vec<(String, Type)>, Options)> {
+    preceded(terminated(tag("parse-kv"), multispace1), tuple((
+        terminated(expr, multispace0),
+        terminated(preceded(terminated(tag("as"), multispace0), delimited(tag("("), type_mapping, tag(")"))), multispace0),
+        preceded(terminated(tag("with"), multispace1), delimited(tag("("), options_with_comma_and_quoted, tag(")"))))
+    ))(i)
+}
+
 fn print_operator(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     preceded(terminated(tag("print"), multispace0), separated_list0(
         trim(tag(",")),
@@ -619,6 +644,7 @@ fn operator(i: &str) -> IResult<&str, Operator> {
         alt((
             map(parse_operator, |(o, e, p)| Operator::Parse(o, e, p)),
             map(parse_where_operator, |(o, e, p)| Operator::ParseWhere(o, e, p)),
+            map(parse_kv_operator, |(e, t, o)| Operator::ParseKV(e, t, o)),
         )),
         alt((
             map(sample_operator, |s| Operator::Sample(s)),

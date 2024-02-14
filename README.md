@@ -79,7 +79,7 @@ project-rename|✅|❌
 project-reorder|✅|❌
 parse|✅|❌
 parse-where|✅|❌
-parse-kv|❌|❌
+parse-kv|✅|❌
 partition|❌|❌
 range|✅|❌
 reduce|❌|❌
