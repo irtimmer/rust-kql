@@ -139,8 +139,10 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
 fn type_to_datatype(t: &Type) -> DataType {
     match t {
         Type::Bool => DataType::Boolean,
+        Type::Decimal => DataType::Float64,
         Type::Int => DataType::Int32,
         Type::Long => DataType::Int64,
+        Type::Real => DataType::Float32,
         Type::String => DataType::Utf8,
         Type::Timespan => DataType::Duration(TimeUnit::Nanosecond),
         _ => panic!("Not supported")
@@ -150,8 +152,10 @@ fn type_to_datatype(t: &Type) -> DataType {
 fn literal_to_expr(val: &KqlLiteral) -> Expr {
     match val {
         KqlLiteral::Bool(x) => ScalarValue::from(*x).lit(),
+        KqlLiteral::Decimal(x) => ScalarValue::from(*x).lit(),
         KqlLiteral::Int(x) => ScalarValue::from(*x).lit(),
         KqlLiteral::Long(x) => ScalarValue::from(*x).lit(),
+        KqlLiteral::Real(x) => ScalarValue::from(*x).lit(),
         KqlLiteral::String(x) => ScalarValue::from(x.clone()).lit(),
         KqlLiteral::Timespan(x) => ScalarValue::DurationNanosecond(*x).lit(),
         _ => panic!("Not supported")
