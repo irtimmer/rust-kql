@@ -72,6 +72,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
             KqlExpr::Literal(v) => literal_to_expr(v),
             KqlExpr::Ident(x) => col(x.as_str()),
             KqlExpr::Func(x, y) => self.func_to_expr(ctx, x.as_str(), y)?,
+            _ => return Err(DataFusionError::NotImplemented("Expr not implemented".to_string()))
         })
     }
 

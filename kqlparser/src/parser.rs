@@ -244,10 +244,19 @@ fn ident_expr(i: &str) -> IResult<&str, Expr> {
 }
 
 fn delim_expr(i: &str) -> IResult<&str, Expr> {
-    alt((
+    let (i, ident) = alt((
         delimited(tag("("), trim(or_expr), tag(")")),
         ident_expr,
-    ))(i)
+    ))(i)?;
+
+    fold_many0(alt((
+        trim(preceded(opt(trim(tag("."))), delimited(
+            tag("["),
+            trim(expr),
+            tag("]"),
+        ))),
+        map(preceded(trim(tag(".")), identifier), |i| Expr::Ident(i)),
+    )), move || ident.clone(), |f, i| Expr::Index(Box::new(f), Box::new(i)))(i)
 }
 
 fn muldiv_expr(i: &str) -> IResult<&str, Expr> {

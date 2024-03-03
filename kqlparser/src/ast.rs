@@ -62,6 +62,7 @@ pub enum Operator {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Ident(String),
+    Index(Box<Expr>, Box<Expr>),
     Literal(Literal),
     Equals(Box<Expr>, Box<Expr>),
     NotEquals(Box<Expr>, Box<Expr>),
