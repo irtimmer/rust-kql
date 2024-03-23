@@ -43,6 +43,7 @@ pub enum Operator {
     Parse(Options, Expr, Vec<PatternToken>),
     ParseWhere(Options, Expr, Vec<PatternToken>),
     ParseKV(Expr, Vec<(String, Type)>, Options),
+    Partition(Options, String, Option<Source>, Vec<Operator>),
     Project(Vec<(Option<String>, Expr)>),
     ProjectAway(Vec<String>),
     ProjectKeep(Vec<String>),

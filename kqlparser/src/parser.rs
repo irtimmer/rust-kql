@@ -485,6 +485,17 @@ fn parse_kv_operator(i: &str) -> IResult<&str, (Expr, Vec<(String, Type)>, Optio
     ))(i)
 }
 
+fn partition_operator(i: &str) -> IResult<&str, (Options, String, (Option<Source>, Vec<Operator>))> {
+    preceded(terminated(tag("partition"), multispace1), tuple((
+        terminated(options, multispace0),
+        preceded(terminated(tag("by"), multispace1), identifier),
+        alt((
+            map(preceded(multispace0, delimited(tag("("), separated_list0(tag("|"), trim(operator)), tag(")"))), |o| (None, o)),
+            map(separated_pair(source, multispace0, many0(preceded(tag("|"), trim(operator)))), |(s, o)| (Some(s), o))
+        ))
+    )))(i)
+}
+
 fn print_operator(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     preceded(terminated(tag("print"), multispace0), separated_list0(
         trim(tag(",")),
@@ -657,13 +668,16 @@ fn operator(i: &str) -> IResult<&str, Operator> {
             map(parse_where_operator, |(o, e, p)| Operator::ParseWhere(o, e, p)),
             map(parse_kv_operator, |(e, t, o)| Operator::ParseKV(e, t, o)),
         )),
+        map(partition_operator, |(o, a, (s, g))| Operator::Partition(o, a, s, g)),
         alt((
             map(sample_operator, |s| Operator::Sample(s)),
             map(sample_distinct_operator, |(s, c)| Operator::SampleDistinct(s, c))
         )),
-        map(serialize_operator, |e| Operator::Serialize(e)),
-        map(summarize_operator, |(a, g)| Operator::Summarize(a, g)),
-        map(sort_operator, |o| Operator::Sort(o)),
+        alt((
+            map(serialize_operator, |e| Operator::Serialize(e)),
+            map(summarize_operator, |(a, g)| Operator::Summarize(a, g)),
+            map(sort_operator, |o| Operator::Sort(o)),
+        )),
         alt((
             map(take_operator, |t| Operator::Take(t)),
             map(top_operator, |(n, e, s, o)| Operator::Top(n, e, s, o))

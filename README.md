@@ -80,7 +80,7 @@ project-reorder|✅|❌
 parse|✅|❌
 parse-where|✅|❌
 parse-kv|✅|❌
-partition|❌|❌
+partition|✅|❌
 range|✅|❌
 reduce|❌|❌
 render|❌|❌
