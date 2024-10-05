@@ -82,7 +82,7 @@ parse-where|✅|❌
 parse-kv|✅|❌
 partition|✅|❌
 range|✅|❌
-reduce|❌|❌
+reduce|✅|❌
 render|❌|❌
 sample|✅|❌
 sample-distinct|✅|❌

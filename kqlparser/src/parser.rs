@@ -559,6 +559,14 @@ fn range_operator(i: &str) -> IResult<&str, (String, Expr, Expr, Expr)> {
     )))(i)
 }
 
+fn reduce_operator(i: &str) -> IResult<&str, (Options, Expr, Option<Options>)> {
+    preceded(terminated(tag("reduce"), multispace1), tuple((
+        terminated(options, multispace0),
+        terminated(preceded(terminated(tag("by"), multispace1), expr), multispace0),
+        opt(preceded(terminated(tag("with"), multispace1), options_with_comma_and_quoted))
+    )))(i)
+}
+
 fn sample_operator(i: &str) -> IResult<&str, u32> {
     preceded(
         terminated(tag("sample"), multispace1),
@@ -669,6 +677,7 @@ fn operator(i: &str) -> IResult<&str, Operator> {
             map(parse_kv_operator, |(e, t, o)| Operator::ParseKV(e, t, o)),
         )),
         map(partition_operator, |(o, a, (s, g))| Operator::Partition(o, a, s, g)),
+        map(reduce_operator, |(o, e, p)| Operator::Reduce(o, e, p)),
         alt((
             map(sample_operator, |s| Operator::Sample(s)),
             map(sample_distinct_operator, |(s, c)| Operator::SampleDistinct(s, c))

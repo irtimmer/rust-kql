@@ -49,6 +49,7 @@ pub enum Operator {
     ProjectKeep(Vec<String>),
     ProjectRename(Vec<(String, String)>),
     ProjectReorder(Vec<(String, Option<(bool, bool)>)>),
+    Reduce(Options, Expr, Option<Options>),
     Sample(u32),
     SampleDistinct(u32, String),
     Serialize(Vec<(Option<String>, Expr)>),
