@@ -113,6 +113,7 @@ pub enum OptionLiteral {
     Bool(bool),
     Long(i64),
     String(String),
+    Identifier(String)
 }
 
 #[derive(Debug, Clone, PartialEq)]

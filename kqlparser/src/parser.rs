@@ -40,7 +40,8 @@ fn option_quoted_literal(i: &str) -> IResult<&str, OptionLiteral> {
         value(OptionLiteral::Bool(true), tag("true")),
         value(OptionLiteral::Bool(false), tag("false")),
         map(i64, |x| OptionLiteral::Long(x)),
-        map(string, |s| OptionLiteral::String(s))
+        map(string, |s| OptionLiteral::String(s)),
+        map(identifier, |s| OptionLiteral::Identifier(s))
     ))(i)
 }
 
