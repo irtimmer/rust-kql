@@ -83,7 +83,7 @@ parse-kv|✅|❌
 partition|✅|❌
 range|✅|❌
 reduce|✅|❌
-render|❌|❌
+render|✅|❌
 sample|✅|❌
 sample-distinct|✅|❌
 scan|❌|❌

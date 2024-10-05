@@ -650,17 +650,19 @@ fn union_operator(i: &str) -> IResult<&str, (Options, Vec<Source>)> {
 
 fn operator(i: &str) -> IResult<&str, Operator> {
     alt((
-        map(as_operator, |(o, a)| Operator::As(o, a)),
-        map(consume_operator, |o| Operator::Consume(o)),
-        map(count_operator, |_| Operator::Count),
-        map(distinct_operator, |c| Operator::Distinct(c)),
-        map(evaluate_operator, |(o, n, x)| Operator::Evaluate(o, n, x)),
-        map(extend_operator, |e| Operator::Extend(e)),
-        map(facet_operator, |(a, g)| Operator::Facet(a, g)),
-        map(fork_operator, |f| Operator::Fork(f)),
-        map(getschema_operator, |_| Operator::Getschema),
-        map(join_operator, |(o, a, g)| Operator::Join(o, a, g)),
-        map(lookup_operator, |(o, a, g)| Operator::Lookup(o, a, g)),
+        alt((
+            map(as_operator, |(o, a)| Operator::As(o, a)),
+            map(consume_operator, |o| Operator::Consume(o)),
+            map(count_operator, |_| Operator::Count),
+            map(distinct_operator, |c| Operator::Distinct(c)),
+            map(evaluate_operator, |(o, n, x)| Operator::Evaluate(o, n, x)),
+            map(extend_operator, |e| Operator::Extend(e)),
+            map(facet_operator, |(a, g)| Operator::Facet(a, g)),
+            map(fork_operator, |f| Operator::Fork(f)),
+            map(getschema_operator, |_| Operator::Getschema),
+            map(join_operator, |(o, a, g)| Operator::Join(o, a, g)),
+            map(lookup_operator, |(o, a, g)| Operator::Lookup(o, a, g)),
+        )),
         alt((
             map(mv_apply_operator, |(a, g)| Operator::MvApply(a, g)),
             map(mv_expand_operator, |e| Operator::MvExpand(e)),
@@ -679,6 +681,7 @@ fn operator(i: &str) -> IResult<&str, Operator> {
         )),
         map(partition_operator, |(o, a, (s, g))| Operator::Partition(o, a, s, g)),
         map(reduce_operator, |(o, e, p)| Operator::Reduce(o, e, p)),
+        map(render_operator, |(v, p)| Operator::Render(v, p)),
         alt((
             map(sample_operator, |s| Operator::Sample(s)),
             map(sample_distinct_operator, |(s, c)| Operator::SampleDistinct(s, c))
