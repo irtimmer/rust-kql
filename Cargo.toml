@@ -16,9 +16,9 @@ repository = "https://github.com/irtimmer/rust-kql"
 version = "0.0.1"
 
 [workspace.dependencies]
-arrow-schema = "49.0.0"
-datafusion = "34.0.0"
-datafusion-common = "34.0.0"
-datafusion-expr = "34.0.0"
+arrow-schema = "53.0.0"
+datafusion = "42.0.0"
+datafusion-common = "42.0.0"
+datafusion-expr = "42.0.0"
 kqlparser = { path = "kqlparser", version = "0.0.1" }
 datafusion-kql = { path = "datafusion-kql", version = "0.0.1" }
