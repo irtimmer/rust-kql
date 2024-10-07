@@ -568,6 +568,13 @@ fn reduce_operator(i: &str) -> IResult<&str, (Options, Expr, Option<Options>)> {
     )))(i)
 }
 
+fn render_operator(i: &str) -> IResult<&str, (String, Option<Options>)> {
+    preceded(terminated(tag("render"), multispace1), tuple((
+        terminated(identifier, multispace0),
+        opt(preceded(terminated(tag("with"), multispace1), delimited(tag("("), options_with_comma_and_quoted, tag(")")))))
+    ))(i)
+}
+
 fn sample_operator(i: &str) -> IResult<&str, u32> {
     preceded(
         terminated(tag("sample"), multispace1),
