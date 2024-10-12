@@ -4,13 +4,11 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::arrow::util::pretty;
 use datafusion::execution::context::SessionContext;
 
+use datafusion_kql::SessionStateExt;
+
 use std::error::Error;
 use std::ffi::OsStr;
 use std::path::PathBuf;
-
-mod kql;
-
-use crate::kql::execute_kql;
 
 #[derive(Parser)]
 struct Cli {
@@ -21,7 +19,7 @@ struct Cli {
 
 async fn execute(ctx: &SessionContext, query: &str) -> Result<(), Box<dyn Error>> {
     let state = ctx.state();
-    let plan = execute_kql(&state, query).await?;
+    let plan = state.create_logical_plan_kql(query).await?;
     let results: Vec<RecordBatch> = ctx.execute_logical_plan(plan).await?.collect().await?;
     pretty::print_batches(&results)?;
     Ok(())

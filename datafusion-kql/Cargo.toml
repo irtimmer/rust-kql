@@ -12,6 +12,7 @@ authors = { workspace = true }
 [dependencies]
 kqlparser = { workspace = true }
 arrow-schema = { workspace = true }
+datafusion = { workspace = true }
 datafusion-common = { workspace = true }
 datafusion-expr = { workspace = true }
 itertools = "0.12"
