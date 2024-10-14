@@ -54,7 +54,7 @@ pub enum Operator {
     Sample(u32),
     SampleDistinct(u32, String),
     Serialize(Vec<(Option<String>, Expr)>),
-    Summarize(Vec<Expr>, Vec<Expr>),
+    Summarize(Vec<(Option<String>, Expr)>, Vec<Expr>),
     Sort(Vec<String>),
     Take(u32),
     Top(u32, Expr, bool, bool),

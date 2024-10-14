@@ -603,9 +603,12 @@ fn serialize_operator(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     ))(i)
 }
 
-fn summarize_operator(i: &str) -> IResult<&str, (Vec<Expr>, Vec<Expr>)> {
+fn summarize_operator(i: &str) -> IResult<&str, (Vec<(Option<String>, Expr)>, Vec<Expr>)> {
     preceded(terminated(tag("summarize"), multispace1), pair(
-        separated_list0(tag(","), trim(expr)),
+        separated_list0(tag(","), trim(alt((
+            map(separated_pair(identifier, trim(tag("=")), expr), |(n, e)| (Some(n), e)),
+            map(expr, |e| (None, e))
+        )))),
         map(opt(preceded(
             terminated(tag("by"), multispace1),
             separated_list1(tag(","), trim(expr))

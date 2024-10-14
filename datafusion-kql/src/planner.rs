@@ -109,7 +109,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
                 }))?,
                 Operator::Summarize(x, y) => {
                     let mut ctx1 = ctx.clone();
-                    builder.aggregate(y.iter().map(|z| self.ast_to_expr(&mut ctx1, z).unwrap()), x.iter().map(|z| self.ast_to_expr(ctx, z).unwrap()))?
+                    builder.aggregate(y.iter().map(|z| self.ast_to_expr(&mut ctx1, z).unwrap()), x.iter().map(|(_, z)| self.ast_to_expr(ctx, z).unwrap()))?
                 },
                 Operator::Sort(o) => builder.sort(o.iter().map(|c| SortExpr::new(col(c), false, false)))?,
                 Operator::Take(x) => builder.limit(0, Some((*x).try_into().unwrap()))?,
