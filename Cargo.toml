@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "arrow-kq-ext",
     "datafusion-kql",
     "kq",
     "kqlparser"
@@ -16,6 +17,8 @@ repository = "https://github.com/irtimmer/rust-kql"
 version = "0.0.2"
 
 [workspace.dependencies]
+arrow-array = "53.0.0"
+arrow-kq-ext = { path = "arrow-kq-ext", version = "0.0.2" }
 arrow-schema = "53.0.0"
 datafusion = "42.0.0"
 datafusion-common = "42.0.0"
