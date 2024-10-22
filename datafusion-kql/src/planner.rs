@@ -66,6 +66,30 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
 
     fn query_statement_to_plan(&self, ctx: &mut PlannerContext, query: &TabularExpression) -> Result<LogicalPlan> {
         let mut builder = match &query.source {
+            Source::Print(v) => {
+                let values = v.iter()
+                    .map(|(_, v)| self.ast_to_expr(ctx, v))
+                    .collect::<Result<Vec<Expr>>>()?;
+
+                let mut print_idx = 0;
+                let schema = DFSchema::empty();
+                let fields = values.iter()
+                    .zip(v)
+                    .map(|(v, (n, _))| {
+                        let name = n.clone().unwrap_or_else(|| {
+                            let name = format!("print_{}", print_idx);
+                            print_idx += 1;
+                            name
+                        });
+                        Ok((None, Arc::new(Field::new(name, v.get_type(&schema)?, true))))
+                    })
+                    .collect::<Result<Vec<(Option<TableReference>, Arc<Field>)>>>()?;
+
+                LogicalPlanBuilder::from(LogicalPlan::Values(Values {
+                    schema: Arc::new(DFSchema::new_with_metadata(fields, HashMap::default())?),
+                    values: vec![values]
+                }))
+            }
             Source::Datatable(s, d) => LogicalPlanBuilder::from(LogicalPlan::Values(Values {
                 schema: Arc::new(DFSchema::new_with_metadata(s.iter().map(|(n, t)| (None::<TableReference>, Arc::new(Field::new(n, type_to_datatype(t), true)))).collect(), HashMap::default()).unwrap()),
                 values: d.iter().chunks(s.len()).into_iter().map(|chunk| chunk.map(|r| self.ast_to_expr(ctx, r).unwrap()).collect()).collect()
