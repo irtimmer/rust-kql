@@ -499,8 +499,11 @@ fn partition_operator(i: &str) -> IResult<&str, (Options, String, (Option<Source
 
 fn print_operator(i: &str) -> IResult<&str, Vec<(Option<String>, Expr)>> {
     preceded(terminated(tag("print"), multispace0), separated_list0(
-        trim(tag(",")),
-        map(separated_pair(identifier, trim(tag("=")), expr), |(n, e)| (Some(n), e)),
+        tag(","),
+        trim(alt((
+            map(separated_pair(identifier, trim(tag("=")), expr), |(n, e)| (Some(n), e)),
+            map(expr, |e| (None, e))
+        )))
     ))(i)
 }
 
