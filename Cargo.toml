@@ -14,14 +14,14 @@ homepage = "https://github.com/irtimmer/rust-kql"
 license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/irtimmer/rust-kql"
-version = "0.0.2"
+version = "0.0.3"
 
 [workspace.dependencies]
 arrow-array = "53.0.0"
-arrow-kq-ext = { path = "arrow-kq-ext", version = "0.0.2" }
+arrow-kq-ext = { path = "arrow-kq-ext", version = "0.0.3" }
 arrow-schema = "53.0.0"
-datafusion = "42.0.0"
-datafusion-common = "42.0.0"
-datafusion-expr = "42.0.0"
-kqlparser = { path = "kqlparser", version = "0.0.2" }
-datafusion-kql = { path = "datafusion-kql", version = "0.0.2" }
+datafusion = "42.1.0"
+datafusion-common = "42.1.0"
+datafusion-expr = "42.1.0"
+kqlparser = { path = "kqlparser", version = "0.0.3" }
+datafusion-kql = { path = "datafusion-kql", version = "0.0.3" }
