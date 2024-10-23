@@ -3,7 +3,7 @@ use arrow_schema::{DataType, Field, TimeUnit};
 use datafusion_common::{TableReference, JoinType, Column, DFSchema, ScalarValue};
 use datafusion_common::{DataFusionError, Result};
 
-use datafusion_expr::Values;
+use datafusion_expr::{ExprSchemable, Values};
 use datafusion_expr::expr::{AggregateFunction, ScalarFunction, WindowFunction};
 use datafusion_expr::expr_fn::col;
 use datafusion_expr::planner::ContextProvider;
