@@ -73,9 +73,9 @@ mv-apply|✅|❌
 mv-expand|✅|✅
 print|✅|✅
 project|✅|✅
-project-away|✅|❌
-project-keep|✅|❌
-project-rename|✅|❌
+project-away|✅|✅
+project-keep|✅|✅
+project-rename|✅|✅
 project-reorder|✅|❌
 parse|✅|❌
 parse-where|✅|❌

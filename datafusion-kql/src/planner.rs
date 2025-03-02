@@ -14,8 +14,11 @@ use itertools::Itertools;
 
 use kqlparser::ast::{Expr as KqlExpr, Operator, TabularExpression, Literal as KqlLiteral, Source, Type};
 
+use wildmatch::WildMatch;
+
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::vec;
 
 #[derive(Default, Clone)]
 struct PlannerContext {}
@@ -123,6 +126,32 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
                     }
                     expr
                 }))?,
+                Operator::ProjectAway(x) => {
+                    let wildcards: Vec<WildMatch> = x.iter().map(|w| WildMatch::new(w)).collect();
+                    let current_schema = builder.schema().clone();
+                    let columns = current_schema.columns().into_iter()
+                        .filter(|f| !wildcards.iter().any(|w| w.matches(f.name())))
+                        .map(|f| Expr::Column(f));
+                    builder.project(columns)?
+                },
+                Operator::ProjectKeep(x) => {
+                    let wildcards: Vec<WildMatch> = x.iter().map(|w| WildMatch::new(w)).collect();
+                    let current_schema = builder.schema().clone();
+                    let columns = current_schema.columns().into_iter()
+                        .filter(|f| wildcards.iter().any(|w| w.matches(f.name())))
+                        .map(|f| Expr::Column(f));
+                    builder.project(columns)?
+                },
+                Operator::ProjectRename(x) => {
+                    let mapping: HashMap<String, String> = x.iter().cloned().collect();
+                    let current_schema = builder.schema().clone();
+                    let columns = current_schema.columns().into_iter()
+                        .map(|f| {
+                            let name = mapping.get(f.name()).cloned().unwrap_or_else(|| f.name().to_string());
+                            Expr::Column(f).alias(name)
+                        });
+                    builder.project(columns)?
+                },
                 Operator::Where(x) => builder.filter(self.ast_to_expr(ctx, &x)?)?,
                 Operator::Serialize(x) => builder.window(x.iter().map(|(a, b)| {
                     let mut expr = self.ast_to_expr(ctx, b).unwrap();
