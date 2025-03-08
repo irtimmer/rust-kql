@@ -14,14 +14,11 @@ use itertools::Itertools;
 
 use kqlparser::ast::{Expr as KqlExpr, Operator, TabularExpression, Literal as KqlLiteral, Source, Type};
 
-use wildmatch::WildMatch;
-
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::vec;
 
-#[derive(Default, Clone)]
-struct PlannerContext {}
+use crate::LogicalPlanBuilderExt;
 
 pub struct KqlToRel<'a, S: ContextProvider> {
     ctx: &'a S,
@@ -32,8 +29,8 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
         KqlToRel { ctx }
     }
 
-    fn func_to_expr(&self, ctx: &mut PlannerContext, name: &str, args: &Vec<KqlExpr>) -> Result<Expr> {
-        let args = args.iter().map(|a| self.ast_to_expr(ctx, a)).collect::<Result<Vec<Expr>>>()?;
+    fn func_to_expr(&self, name: &str, args: &Vec<KqlExpr>) -> Result<Expr> {
+        let args = args.iter().map(|a| self.ast_to_expr(a)).collect::<Result<Vec<Expr>>>()?;
         if let Some(f) = self.ctx.get_function_meta(&name) {
             Ok(Expr::ScalarFunction(ScalarFunction::new_udf(f, args)))
         } else if let Some(f) = self.ctx.get_aggregate_meta(&name) {
@@ -45,33 +42,33 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
         }
     }
 
-    fn ast_to_expr(&self, ctx: &mut PlannerContext, ast: &KqlExpr) -> Result<Expr> {
+    fn ast_to_expr(&self, ast: &KqlExpr) -> Result<Expr> {
         Ok(match ast {
-            KqlExpr::Equals(x, y) => self.ast_to_expr(ctx, &x)?.eq(self.ast_to_expr(ctx, &y)?),
-            KqlExpr::NotEquals(x, y) => self.ast_to_expr(ctx, &x)?.not_eq(self.ast_to_expr(ctx, &y)?),
-            KqlExpr::And(x, y) => self.ast_to_expr(ctx, &x)?.and(self.ast_to_expr(ctx, &y)?),
-            KqlExpr::Or(x, y) => self.ast_to_expr(ctx, &x)?.or(self.ast_to_expr(ctx, &y)?),
-            KqlExpr::Add(x, y) => self.ast_to_expr(ctx, &x)? + self.ast_to_expr(ctx, &y)?,
-            KqlExpr::Substract(x, y) => self.ast_to_expr(ctx, &x)? - self.ast_to_expr(ctx, &y)?,
-            KqlExpr::Multiply(x, y) => self.ast_to_expr(ctx, &x)? * self.ast_to_expr(ctx, &y)?,
-            KqlExpr::Divide(x, y) => self.ast_to_expr(ctx, &x)? / self.ast_to_expr(ctx, &y)?,
-            KqlExpr::Modulo(x, y) => self.ast_to_expr(ctx, &x)? % self.ast_to_expr(ctx, &y)?,
-            KqlExpr::Less(x, y) => self.ast_to_expr(ctx, &x)?.lt(self.ast_to_expr(ctx, &y)?),
-            KqlExpr::Greater(x, y) => self.ast_to_expr(ctx, &x)?.gt(self.ast_to_expr(ctx, &y)?),
-            KqlExpr::LessOrEqual(x, y) => self.ast_to_expr(ctx, &x)?.lt_eq(self.ast_to_expr(ctx, &y)?),
-            KqlExpr::GreaterOrEqual(x, y) => self.ast_to_expr(ctx, &x)?.gt_eq(self.ast_to_expr(ctx, &y)?),
+            KqlExpr::Equals(x, y) => self.ast_to_expr(&x)?.eq(self.ast_to_expr(&y)?),
+            KqlExpr::NotEquals(x, y) => self.ast_to_expr(&x)?.not_eq(self.ast_to_expr(&y)?),
+            KqlExpr::And(x, y) => self.ast_to_expr(&x)?.and(self.ast_to_expr(&y)?),
+            KqlExpr::Or(x, y) => self.ast_to_expr(&x)?.or(self.ast_to_expr(&y)?),
+            KqlExpr::Add(x, y) => self.ast_to_expr(&x)? + self.ast_to_expr(&y)?,
+            KqlExpr::Substract(x, y) => self.ast_to_expr(&x)? - self.ast_to_expr(&y)?,
+            KqlExpr::Multiply(x, y) => self.ast_to_expr(&x)? * self.ast_to_expr(&y)?,
+            KqlExpr::Divide(x, y) => self.ast_to_expr(&x)? / self.ast_to_expr(&y)?,
+            KqlExpr::Modulo(x, y) => self.ast_to_expr(&x)? % self.ast_to_expr(&y)?,
+            KqlExpr::Less(x, y) => self.ast_to_expr(&x)?.lt(self.ast_to_expr(&y)?),
+            KqlExpr::Greater(x, y) => self.ast_to_expr(&x)?.gt(self.ast_to_expr(&y)?),
+            KqlExpr::LessOrEqual(x, y) => self.ast_to_expr(&x)?.lt_eq(self.ast_to_expr(&y)?),
+            KqlExpr::GreaterOrEqual(x, y) => self.ast_to_expr(&x)?.gt_eq(self.ast_to_expr(&y)?),
             KqlExpr::Literal(v) => literal_to_expr(v),
             KqlExpr::Ident(x) => col(x.as_str()),
-            KqlExpr::Func(x, y) => self.func_to_expr(ctx, x.as_str(), y)?,
+            KqlExpr::Func(x, y) => self.func_to_expr(x.as_str(), y)?,
             _ => return Err(DataFusionError::NotImplemented("Expr not implemented".to_string()))
         })
     }
 
-    fn query_statement_to_plan(&self, ctx: &mut PlannerContext, query: &TabularExpression) -> Result<LogicalPlan> {
+    fn query_statement_to_plan(&self, query: &TabularExpression) -> Result<LogicalPlan> {
         let mut builder = match &query.source {
             Source::Print(v) => {
                 let values = v.iter()
-                    .map(|(_, v)| self.ast_to_expr(ctx, v))
+                    .map(|(_, v)| self.ast_to_expr(v))
                     .collect::<Result<Vec<Expr>>>()?;
 
                 let mut print_idx = 0;
@@ -95,7 +92,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
             }
             Source::Datatable(s, d) => LogicalPlanBuilder::from(LogicalPlan::Values(Values {
                 schema: Arc::new(DFSchema::new_with_metadata(s.iter().map(|(n, t)| (None::<TableReference>, Arc::new(Field::new(n, type_to_datatype(t), true)))).collect(), HashMap::default()).unwrap()),
-                values: d.iter().chunks(s.len()).into_iter().map(|chunk| chunk.map(|r| self.ast_to_expr(ctx, r).unwrap()).collect()).collect()
+                values: d.iter().chunks(s.len()).into_iter().map(|chunk| chunk.map(|r| self.ast_to_expr(r).unwrap()).collect()).collect()
             })),
             Source::Reference(n) => LogicalPlanBuilder::scan(n.clone(), self.ctx.get_table_source(TableReference::from(n.as_str()))?, None)?,
             _ => return Err(DataFusionError::NotImplemented("Source not implemented".to_string())),
@@ -103,69 +100,21 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
 
         for op in query.operators.iter() {
             builder = match op {
-                Operator::MvExpand(x) => builder.unnest_column(Column::from(x))?,
-                Operator::Extend(x) => {
-                    let current_schema = builder.schema().clone();
-                    let current_columns = current_schema.columns().into_iter().map(|f| Expr::Column(f));
-                    builder.project(current_columns.chain(x.iter().map(|(a, b)| {
-                        let mut expr = self.ast_to_expr(ctx, b).unwrap();
-                        if let Some(alias) = a {
-                            expr = expr.alias(alias);
-                        }
-                        expr
-                    })))?
-                },
+                Operator::MvExpand(x) => builder.mv_expand(Column::from(x))?,
+                Operator::Extend(x) => builder.extend(x.iter().map(|(a, b)| (a.clone(), self.ast_to_expr(b).unwrap())))?,
                 Operator::Join(_, x, y) => {
                     let keys: Vec<&str> = y.iter().map(|s| s.as_ref()).collect();
-                    builder.join(self.query_statement_to_plan(ctx, &x)?, JoinType::Inner, (keys.clone(), keys), Option::None)?
+                    builder.join(self.query_statement_to_plan(&x)?, JoinType::Inner, (keys.clone(), keys), Option::None)?
                 },
-                Operator::Project(x) => builder.project(x.iter().map(|(a, b)| {
-                    let mut expr = self.ast_to_expr(ctx, b).unwrap();
-                    if let Some(alias) = a {
-                        expr = expr.alias(alias);
-                    }
-                    expr
-                }))?,
-                Operator::ProjectAway(x) => {
-                    let wildcards: Vec<WildMatch> = x.iter().map(|w| WildMatch::new(w)).collect();
-                    let current_schema = builder.schema().clone();
-                    let columns = current_schema.columns().into_iter()
-                        .filter(|f| !wildcards.iter().any(|w| w.matches(f.name())))
-                        .map(|f| Expr::Column(f));
-                    builder.project(columns)?
-                },
-                Operator::ProjectKeep(x) => {
-                    let wildcards: Vec<WildMatch> = x.iter().map(|w| WildMatch::new(w)).collect();
-                    let current_schema = builder.schema().clone();
-                    let columns = current_schema.columns().into_iter()
-                        .filter(|f| wildcards.iter().any(|w| w.matches(f.name())))
-                        .map(|f| Expr::Column(f));
-                    builder.project(columns)?
-                },
-                Operator::ProjectRename(x) => {
-                    let mapping: HashMap<String, String> = x.iter().cloned().collect();
-                    let current_schema = builder.schema().clone();
-                    let columns = current_schema.columns().into_iter()
-                        .map(|f| {
-                            let name = mapping.get(f.name()).cloned().unwrap_or_else(|| f.name().to_string());
-                            Expr::Column(f).alias(name)
-                        });
-                    builder.project(columns)?
-                },
-                Operator::Where(x) => builder.filter(self.ast_to_expr(ctx, &x)?)?,
-                Operator::Serialize(x) => builder.window(x.iter().map(|(a, b)| {
-                    let mut expr = self.ast_to_expr(ctx, b).unwrap();
-                    if let Some(alias) = a {
-                        expr = expr.alias(alias);
-                    }
-                    expr
-                }))?,
-                Operator::Summarize(x, y) => {
-                    let mut ctx1 = ctx.clone();
-                    builder.aggregate(y.iter().map(|z| self.ast_to_expr(&mut ctx1, z).unwrap()), x.iter().map(|(_, z)| self.ast_to_expr(ctx, z).unwrap()))?
-                },
+                Operator::Project(x) => builder.project_with_alias(x.iter().map(|(a, b)| (a.clone(), self.ast_to_expr(b).unwrap())))?,
+                Operator::ProjectAway(x) => builder.project_away(x)?,
+                Operator::ProjectKeep(x) => builder.project_keep(x)?,
+                Operator::ProjectRename(x) => builder.project_rename(x.iter().cloned().collect())?,
+                Operator::Where(x) => builder.filter(self.ast_to_expr(&x)?)?,
+                Operator::Serialize(x) => builder.serialize(x.iter().map(|(a, e)| (a.clone(), self.ast_to_expr(e).unwrap())))?,
+                Operator::Summarize(x, y) => builder.summarize(x.iter().map(|(a, b)| (a.clone(), self.ast_to_expr(b).unwrap())), y.iter().map(|x| self.ast_to_expr(x).unwrap()))?,
                 Operator::Sort(o) => builder.sort(o.iter().map(|c| SortExpr::new(col(c), false, false)))?,
-                Operator::Take(x) => builder.limit(0, Some((*x).try_into().unwrap()))?,
+                Operator::Take(x) => builder.take(*x)?,
                 _ => return Err(DataFusionError::NotImplemented("Operator not implemented".to_string())),
             };
         }
@@ -174,7 +123,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
     }
 
     pub fn query_to_plan(&self, query: &TabularExpression) -> Result<LogicalPlan> {
-        self.query_statement_to_plan(&mut PlannerContext::default(), query)
+        self.query_statement_to_plan(query)
     }
 }
 
