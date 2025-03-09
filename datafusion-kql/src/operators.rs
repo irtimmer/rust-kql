@@ -4,9 +4,12 @@ use datafusion_common::{Column, Result};
 
 use datafusion_expr::{Expr, LogicalPlanBuilder};
 
+use datafusion_functions_aggregate::count::count_all;
+
 use wildmatch::WildMatch;
 
 pub trait LogicalPlanBuilderExt {
+    fn count(self) -> Result<LogicalPlanBuilder>;
     fn extend<I: IntoIterator<Item = (Option<impl Into<String>>, Expr)>>(self, columns: I) -> Result<LogicalPlanBuilder>;
     fn project_away<I: IntoIterator<Item = impl AsRef<str>>>(self, columns: I) -> Result<LogicalPlanBuilder>;
     fn project_keep<I: IntoIterator<Item = impl AsRef<str>>>(self, columns: I) -> Result<LogicalPlanBuilder>;
@@ -19,6 +22,10 @@ pub trait LogicalPlanBuilderExt {
 }
 
 impl LogicalPlanBuilderExt for LogicalPlanBuilder {
+    fn count(self) -> Result<LogicalPlanBuilder> {
+        self.aggregate(Vec::<Expr>::new(), vec![count_all().alias("count")])
+    }
+
     fn extend<I: IntoIterator<Item = (Option<impl Into<String>>, Expr)>>(self, columns: I) -> Result<Self> {
         let current_schema = self.schema().clone();
         let current_columns = current_schema.columns().into_iter().map(|f| Expr::Column(f));

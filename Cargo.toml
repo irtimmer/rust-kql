@@ -23,5 +23,6 @@ arrow-schema = "54.1.0"
 datafusion = "46.0.0"
 datafusion-common = "46.0.0"
 datafusion-expr = "46.0.0"
+datafusion-functions-aggregate = "46.0.0"
 kqlparser = { path = "kqlparser", version = "0.0.4" }
 datafusion-kql = { path = "datafusion-kql", version = "0.0.4" }

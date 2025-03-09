@@ -100,6 +100,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
 
         for op in query.operators.iter() {
             builder = match op {
+                Operator::Count => builder.count()?,
                 Operator::MvExpand(x) => builder.mv_expand(Column::from(x))?,
                 Operator::Extend(x) => builder.extend(x.iter().map(|(a, b)| (a.clone(), self.ast_to_expr(b).unwrap())))?,
                 Operator::Join(_, x, y) => {

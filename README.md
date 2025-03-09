@@ -57,7 +57,7 @@ Operator|Parser|Planner|
 -|-|-|
 as|✅|❌
 consume|✅|❌
-count|✅|❌
+count|✅|✅
 datatable|✅|✅
 distinct|✅|❌
 evaluate|✅|❌
