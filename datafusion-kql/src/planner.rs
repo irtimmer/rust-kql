@@ -103,6 +103,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
                 Operator::Count => builder.count()?,
                 Operator::MvExpand(x) => builder.mv_expand(Column::from(x))?,
                 Operator::Extend(x) => builder.extend(x.iter().map(|(a, b)| (a.clone(), self.ast_to_expr(b).unwrap())))?,
+                Operator::Getschema => builder.getschema()?,
                 Operator::Join(_, x, y) => {
                     let keys: Vec<&str> = y.iter().map(|s| s.as_ref()).collect();
                     builder.join(self.query_statement_to_plan(&x)?, JoinType::Inner, (keys.clone(), keys), Option::None)?

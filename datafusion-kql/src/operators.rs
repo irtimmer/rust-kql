@@ -1,8 +1,11 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
-use datafusion_common::{Column, Result};
+use arrow_schema::{DataType, Field, Fields, TimeUnit};
 
-use datafusion_expr::{Expr, LogicalPlanBuilder};
+use datafusion_common::{Column, DFSchema, Result, ScalarValue};
+
+use datafusion_expr::{Expr, LogicalPlan, LogicalPlanBuilder, Values};
 
 use datafusion_functions_aggregate::count::count_all;
 
@@ -11,6 +14,7 @@ use wildmatch::WildMatch;
 pub trait LogicalPlanBuilderExt {
     fn count(self) -> Result<LogicalPlanBuilder>;
     fn extend<I: IntoIterator<Item = (Option<impl Into<String>>, Expr)>>(self, columns: I) -> Result<LogicalPlanBuilder>;
+    fn getschema(self) -> Result<LogicalPlanBuilder>;
     fn project_away<I: IntoIterator<Item = impl AsRef<str>>>(self, columns: I) -> Result<LogicalPlanBuilder>;
     fn project_keep<I: IntoIterator<Item = impl AsRef<str>>>(self, columns: I) -> Result<LogicalPlanBuilder>;
     fn project_rename(self, columns: HashMap<String, String>) -> Result<LogicalPlanBuilder>;
@@ -30,6 +34,28 @@ impl LogicalPlanBuilderExt for LogicalPlanBuilder {
         let current_schema = self.schema().clone();
         let current_columns = current_schema.columns().into_iter().map(|f| Expr::Column(f));
         self.project(current_columns.chain(alias_columns(columns)))
+    }
+
+    fn getschema(self) -> Result<LogicalPlanBuilder> {
+        let schema = Arc::new(DFSchema::from_unqualified_fields(Fields::from(vec![
+            Field::new("ColumnName", DataType::Utf8, false),
+            Field::new("ColumnOrdinal", DataType::Int64, false),
+            Field::new("DataType", DataType::Utf8, false),
+            Field::new("ColumnType", DataType::Utf8, false)
+        ]), HashMap::default())?);
+        let values = self.schema().fields().iter().enumerate().map(|(i, f)| {
+            vec![
+                Expr::Literal(ScalarValue::Utf8(Some(f.name().to_string()))),
+                Expr::Literal(ScalarValue::Int64(Some(i as i64))),
+                Expr::Literal(ScalarValue::Utf8(Some(f.data_type().to_string()))),
+                Expr::Literal(ScalarValue::Utf8(Some(datatype_to_string(f.data_type()).to_string())))
+            ]
+        }).collect();
+
+        Ok(LogicalPlanBuilder::from(LogicalPlan::Values(Values {
+            schema,
+            values
+        })))
     }
 
     fn project_away<I: IntoIterator<Item = impl AsRef<str>>>(self, columns: I) -> Result<LogicalPlanBuilder> {
@@ -98,4 +124,17 @@ where
             expr
         }
     })
+}
+
+fn datatype_to_string(t: &DataType) -> &str {
+    match t {
+        DataType::Boolean => "bool",
+        DataType::Duration(TimeUnit::Nanosecond) => "timespan",
+        DataType::Float32 => "real",
+        DataType::Float64 => "decimal",
+        DataType::Int32 => "int",
+        DataType::Int64 => "long",
+        DataType::Utf8 => "string",
+        _ => "unknown"
+    }
 }

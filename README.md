@@ -66,7 +66,7 @@ externaldata|✅|❌
 facet|✅|❌
 find|✅|❌
 fork|✅|❌
-getschema|✅|❌
+getschema|✅|✅
 join|✅|🚧
 lookup|✅|❌
 mv-apply|✅|❌
