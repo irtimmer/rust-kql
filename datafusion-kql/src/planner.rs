@@ -117,6 +117,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
                 Operator::Summarize(x, y) => builder.summarize(x.iter().map(|(a, b)| (a.clone(), self.ast_to_expr(b).unwrap())), y.iter().map(|x| self.ast_to_expr(x).unwrap()))?,
                 Operator::Sort(o) => builder.sort(o.iter().map(|c| SortExpr::new(col(c), false, false)))?,
                 Operator::Take(x) => builder.take(*x)?,
+                Operator::Top(n, e, s, o) => builder.top(*n, self.ast_to_expr(e)?, *s, *o)?,
                 _ => return Err(DataFusionError::NotImplemented("Operator not implemented".to_string())),
             };
         }

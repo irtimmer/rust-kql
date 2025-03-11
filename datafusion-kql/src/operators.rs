@@ -5,7 +5,7 @@ use arrow_schema::{DataType, Field, Fields, TimeUnit};
 
 use datafusion_common::{Column, DFSchema, Result, ScalarValue};
 
-use datafusion_expr::{Expr, LogicalPlan, LogicalPlanBuilder, Values};
+use datafusion_expr::{Expr, LogicalPlan, LogicalPlanBuilder, SortExpr, Values};
 
 use datafusion_functions_aggregate::count::count_all;
 
@@ -23,6 +23,7 @@ pub trait LogicalPlanBuilderExt {
     fn serialize<I: IntoIterator<Item = (Option<impl Into<String>>, Expr)>>(self, columns: I) -> Result<LogicalPlanBuilder>;
     fn summarize<G: IntoIterator<Item = (Option<impl Into<String>>, Expr)>, A: IntoIterator<Item = Expr>>(self, group: G, aggr: A) -> Result<LogicalPlanBuilder>;
     fn take(self, count: u32) -> Result<LogicalPlanBuilder>;
+    fn top(self, count: u32, expr: impl Into<Expr>, asc: bool, nulls_first: bool) -> Result<LogicalPlanBuilder>;
 }
 
 impl LogicalPlanBuilderExt for LogicalPlanBuilder {
@@ -107,6 +108,14 @@ impl LogicalPlanBuilderExt for LogicalPlanBuilder {
 
     fn take(self, count: u32) -> Result<Self> {
         self.limit(0, Some(count.try_into().unwrap()))
+    }
+
+    fn top(self, count: u32, expr: impl Into<Expr>, asc: bool, nulls_first: bool) -> Result<Self> {
+        self.sort(vec![SortExpr {
+            expr: expr.into(),
+            asc,
+            nulls_first
+        }])?.limit(0, Some(count.try_into().unwrap()))
     }
 }
 

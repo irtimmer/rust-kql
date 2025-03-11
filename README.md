@@ -92,7 +92,7 @@ serialize|✅|✅
 summarize|✅|✅
 sort|✅|✅
 take|✅|✅
-top|✅|❌
+top|✅|✅
 top-nested|❌|❌
 top-hitters|❌|❌
 union|✅|❌
