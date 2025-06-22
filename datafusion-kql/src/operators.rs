@@ -46,10 +46,10 @@ impl LogicalPlanBuilderExt for LogicalPlanBuilder {
         ]), HashMap::default())?);
         let values = self.schema().fields().iter().enumerate().map(|(i, f)| {
             vec![
-                Expr::Literal(ScalarValue::Utf8(Some(f.name().to_string()))),
-                Expr::Literal(ScalarValue::Int64(Some(i as i64))),
-                Expr::Literal(ScalarValue::Utf8(Some(f.data_type().to_string()))),
-                Expr::Literal(ScalarValue::Utf8(Some(datatype_to_string(f.data_type()).to_string())))
+                Expr::Literal(ScalarValue::Utf8(Some(f.name().to_string())), None),
+                Expr::Literal(ScalarValue::Int64(Some(i as i64)), None),
+                Expr::Literal(ScalarValue::Utf8(Some(f.data_type().to_string())), None),
+                Expr::Literal(ScalarValue::Utf8(Some(datatype_to_string(f.data_type()).to_string())), None)
             ]
         }).collect();
 

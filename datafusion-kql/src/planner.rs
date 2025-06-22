@@ -36,7 +36,7 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
         } else if let Some(f) = self.ctx.get_aggregate_meta(&name) {
             Ok(Expr::AggregateFunction(AggregateFunction::new_udf(f, args, false, None, None, None)))
         } else if let Some(f) = self.ctx.get_window_meta(&name) {
-            Ok(Expr::WindowFunction(WindowFunction::new(f, args)))
+            Ok(Expr::WindowFunction(Box::new(WindowFunction::new(f, args))))
         } else {
             return Err(DataFusionError::NotImplemented("Function not implemented".to_string()));
         }
