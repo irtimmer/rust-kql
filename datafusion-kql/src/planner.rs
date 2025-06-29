@@ -65,7 +65,16 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
     }
 
     fn query_statement_to_plan(&self, query: &TabularExpression) -> Result<LogicalPlan> {
-        let mut builder = match &query.source {
+        let mut builder = self.source_to_builder(&query.source)?;
+        for op in query.operators.iter() {
+            builder = self.apply_operator(builder, op)?;
+        }
+
+        builder.build()
+    }
+
+    fn source_to_builder(&self, source: &Source) -> Result<LogicalPlanBuilder> {
+        Ok(match source {
             Source::Print(v) => {
                 let values = v.iter()
                     .map(|(_, v)| self.ast_to_expr(v))
@@ -95,34 +104,39 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
                 values: d.iter().chunks(s.len()).into_iter().map(|chunk| chunk.map(|r| self.ast_to_expr(r).unwrap()).collect()).collect()
             })),
             Source::Reference(n) => LogicalPlanBuilder::scan(n.clone(), self.ctx.get_table_source(TableReference::from(n.as_str()))?, None)?,
+            Source::Union(_, s) => s.iter()
+                .map(|src| self.source_to_builder(src))
+                .collect::<Result<Vec<LogicalPlanBuilder>>>()?
+                .into_iter()
+                .reduce(|a, b| a.union(b.build().unwrap()).unwrap())
+                .ok_or(DataFusionError::Internal("No sources in union".to_string()))?,
             _ => return Err(DataFusionError::NotImplemented("Source not implemented".to_string())),
-        };
+        })
+    }
 
-        for op in query.operators.iter() {
-            builder = match op {
-                Operator::Count => builder.count()?,
-                Operator::MvExpand(x) => builder.mv_expand(Column::from(x))?,
-                Operator::Extend(x) => builder.extend(x.iter().map(|(a, b)| (a.clone(), self.ast_to_expr(b).unwrap())))?,
-                Operator::Getschema => builder.getschema()?,
-                Operator::Join(_, x, y) => {
-                    let keys: Vec<&str> = y.iter().map(|s| s.as_ref()).collect();
-                    builder.join(self.query_statement_to_plan(&x)?, JoinType::Inner, (keys.clone(), keys), Option::None)?
-                },
-                Operator::Project(x) => builder.project_with_alias(x.iter().map(|(a, b)| (a.clone(), self.ast_to_expr(b).unwrap())))?,
-                Operator::ProjectAway(x) => builder.project_away(x)?,
-                Operator::ProjectKeep(x) => builder.project_keep(x)?,
-                Operator::ProjectRename(x) => builder.project_rename(x.iter().cloned().collect())?,
-                Operator::Where(x) => builder.filter(self.ast_to_expr(&x)?)?,
-                Operator::Serialize(x) => builder.serialize(x.iter().map(|(a, e)| (a.clone(), self.ast_to_expr(e).unwrap())))?,
-                Operator::Summarize(x, y) => builder.summarize(x.iter().map(|(a, b)| (a.clone(), self.ast_to_expr(b).unwrap())), y.iter().map(|x| self.ast_to_expr(x).unwrap()))?,
-                Operator::Sort(o) => builder.sort(o.iter().map(|c| SortExpr::new(col(c), false, false)))?,
-                Operator::Take(x) => builder.take(*x)?,
-                Operator::Top(n, e, s, o) => builder.top(*n, self.ast_to_expr(e)?, *s, *o)?,
-                _ => return Err(DataFusionError::NotImplemented("Operator not implemented".to_string())),
-            };
-        }
-
-        builder.build()
+    fn apply_operator(&self, builder: LogicalPlanBuilder, operator: &Operator) -> Result<LogicalPlanBuilder> {
+        Ok(match operator {
+            Operator::As(_, y) => builder.alias(TableReference::bare(y.as_str()))?,
+            Operator::Count => builder.count()?,
+            Operator::MvExpand(x) => builder.mv_expand(Column::from(x))?,
+            Operator::Extend(x) => builder.extend(x.iter().map(|(a, b)| (a.clone(), self.ast_to_expr(b).unwrap())))?,
+            Operator::Getschema => builder.getschema()?,
+            Operator::Join(_, x, y) => {
+                let keys: Vec<&str> = y.iter().map(|s| s.as_ref()).collect();
+                builder.join(self.query_statement_to_plan(&x)?, JoinType::Inner, (keys.clone(), keys), Option::None)?
+            },
+            Operator::Project(x) => builder.project_with_alias(x.iter().map(|(a, b)| (a.clone(), self.ast_to_expr(b).unwrap())))?,
+            Operator::ProjectAway(x) => builder.project_away(x)?,
+            Operator::ProjectKeep(x) => builder.project_keep(x)?,
+            Operator::ProjectRename(x) => builder.project_rename(x.iter().cloned().collect())?,
+            Operator::Where(x) => builder.filter(self.ast_to_expr(&x)?)?,
+            Operator::Serialize(x) => builder.serialize(x.iter().map(|(a, e)| (a.clone(), self.ast_to_expr(e).unwrap())))?,
+            Operator::Summarize(x, y) => builder.summarize(x.iter().map(|(a, b)| (a.clone(), self.ast_to_expr(b).unwrap())), y.iter().map(|x| self.ast_to_expr(x).unwrap()))?,
+            Operator::Sort(o) => builder.sort(o.iter().map(|c| SortExpr::new(col(c), false, false)))?,
+            Operator::Take(x) => builder.take(*x)?,
+            Operator::Top(n, e, s, o) => builder.top(*n, self.ast_to_expr(e)?, *s, *o)?,
+            _ => return Err(DataFusionError::NotImplemented("Operator not implemented".to_string())),
+        })
     }
 
     pub fn query_to_plan(&self, query: &TabularExpression) -> Result<LogicalPlan> {
