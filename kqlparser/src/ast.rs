@@ -21,7 +21,7 @@ pub enum Source {
     Find(Options, Option<Vec<Source>>, Expr, FindProjection),
     Print(Vec<(Option<String>, Expr)>),
     Range(String, Expr, Expr, Expr),
-    Reference(String),
+    Reference(Option<String>, Option<String>, String),
     Union(Options, Vec<Source>)
 }
 

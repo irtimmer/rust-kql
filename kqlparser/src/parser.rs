@@ -656,9 +656,27 @@ fn union_operator(i: &str) -> IResult<&str, (Options, Vec<Source>)> {
         terminated(options, multispace0),
         separated_list1(trim(tag(",")), alt((
             delimited(tag("("), trim(source), tag(")")),
-            map(identifier, |e| Source::Reference(e))
+            map(table_reference, |(c, d, t)| Source::Reference(c, d, t))
         )))
     )))(i)
+}
+
+fn table_reference(i: &str) -> IResult<&str, (Option<String>, Option<String>, String)> {
+    let (i, cluster) = opt(delimited(
+        tag_no_case("cluster"),
+        delimited(tag("("), trim(string), tag(")")),
+        tag(".")
+    ))(i)?;
+    let (i, database) = opt(delimited(
+        tag_no_case("database"),
+        delimited(tag("("), trim(string), tag(")")),
+        tag(".")
+    ))(i)?;
+    let (i, table) = alt((
+        map(preceded(tag_no_case("table"), delimited(tag("("), trim(string), tag(")"))), |t| t),
+        map(identifier, |t| t)
+    ))(i)?;
+    Ok((i, (cluster, database, table)))
 }
 
 fn operator(i: &str) -> IResult<&str, Operator> {
@@ -721,7 +739,7 @@ fn source(i: &str) -> IResult<&str, Source> {
         map(print_operator, |e| Source::Print(e)),
         map(range_operator, |(c, f, t, s)| Source::Range(c, f, t, s)),
         map(union_operator, |(o, s)| Source::Union(o, s)),
-        map(identifier, |e| Source::Reference(e))
+        map(table_reference, |(c, d, t)| Source::Reference(c, d, t))
     ))(i)
 }
 

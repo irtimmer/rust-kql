@@ -103,7 +103,15 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
                 schema: Arc::new(DFSchema::new_with_metadata(s.iter().map(|(n, t)| (None::<TableReference>, Arc::new(Field::new(n, type_to_datatype(t), true)))).collect(), HashMap::default()).unwrap()),
                 values: d.iter().chunks(s.len()).into_iter().map(|chunk| chunk.map(|r| self.ast_to_expr(r).unwrap()).collect()).collect()
             })),
-            Source::Reference(n) => LogicalPlanBuilder::scan(n.clone(), self.ctx.get_table_source(TableReference::from(n.as_str()))?, None)?,
+            Source::Reference(c, s, t) => {
+                let reference = match (c, s, t) {
+                    (Some(c), Some(s), t) => TableReference::full(c.as_str(), s.as_str(), t.as_str()),
+                    (None, Some(s), t) => TableReference::partial(s.as_str(), t.as_str()),
+                    (None, None, t) => TableReference::bare(t.as_str()),
+                    _ => Err(DataFusionError::NotImplemented("Invalid table reference".to_string()))?
+                };
+                LogicalPlanBuilder::scan(reference.clone(), self.ctx.get_table_source(reference)?, None)?
+            },
             Source::Union(_, s) => s.iter()
                 .map(|src| self.source_to_builder(src))
                 .collect::<Result<Vec<LogicalPlanBuilder>>>()?
