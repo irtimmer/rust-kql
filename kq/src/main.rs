@@ -3,8 +3,7 @@ use clap::Parser;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::arrow::util::pretty;
 use datafusion::execution::context::SessionContext;
-
-use datafusion_kql::SessionStateExt;
+use datafusion_kql::{register_all, SessionStateExt};
 
 use std::error::Error;
 use std::ffi::OsStr;
@@ -29,7 +28,8 @@ async fn execute(ctx: &SessionContext, query: &str) -> Result<(), Box<dyn Error>
 async fn main() -> Result<(), Box<dyn Error>> {
     let args = Cli::parse();
 
-    let ctx = SessionContext::new();
+    let mut ctx = SessionContext::new();
+    register_all(&mut ctx)?;
     for file in &args.file {
         let base = file.file_stem().unwrap().to_str().unwrap();
         match file.extension().and_then(OsStr::to_str) {
