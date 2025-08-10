@@ -21,8 +21,10 @@ arrow-array = "55.0.0"
 arrow-kq-ext = { path = "arrow-kq-ext", version = "0.0.4" }
 arrow-schema = "55.0.0"
 datafusion = { version = "48.0.0", features = ["avro"] }
+datafusion-catalog = "48.0.0"
 datafusion-common = "48.0.0"
 datafusion-expr = "48.0.0"
+datafusion-functions-table = "48.0.0"
 datafusion-functions-aggregate = "48.0.0"
 kqlparser = { path = "kqlparser", version = "0.0.4" }
 datafusion-kql = { path = "datafusion-kql", version = "0.0.4" }

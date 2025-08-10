@@ -3,12 +3,16 @@ use arrow_schema::{DataType, Field, TimeUnit};
 use datafusion_common::{TableReference, JoinType, Column, DFSchema, ScalarValue};
 use datafusion_common::{DataFusionError, Result};
 
-use datafusion_expr::{ExprSchemable, Values};
+use datafusion_catalog::default_table_source::DefaultTableSource;
+
+use datafusion_expr::{ExprSchemable, TableScan, Values};
 use datafusion_expr::expr::{AggregateFunction, ScalarFunction, WindowFunction};
 use datafusion_expr::expr_fn::col;
 use datafusion_expr::planner::ContextProvider;
 use datafusion_expr::logical_plan::{LogicalPlan, LogicalPlanBuilder};
 use datafusion_expr::{Expr, Literal, SortExpr};
+
+use datafusion_functions_table::generate_series;
 
 use itertools::Itertools;
 
@@ -103,6 +107,22 @@ impl<'a, S: ContextProvider> KqlToRel<'a, S> {
                 schema: Arc::new(DFSchema::new_with_metadata(s.iter().map(|(n, t)| (None::<TableReference>, Arc::new(Field::new(n, type_to_datatype(t), true)))).collect(), HashMap::default()).unwrap()),
                 values: d.iter().chunks(s.len()).into_iter().map(|chunk| chunk.map(|r| self.ast_to_expr(r).unwrap()).collect()).collect()
             })),
+            Source::Range(c, b, e, s) => {
+                let start = self.ast_to_expr(b)?;
+                let end = self.ast_to_expr(e)?;
+                let step = self.ast_to_expr(s)?;
+                let provider = generate_series().create_table_provider(&[start, end, step])?;
+                let table_scan = TableScan::try_new(
+                    "range",
+                    Arc::new(DefaultTableSource::new(provider)),
+                    None,
+                    Vec::new(),
+                    None
+                )?;
+
+                LogicalPlanBuilder::from(LogicalPlan::TableScan(table_scan))
+                    .project_rename(HashMap::from([("value".to_string(), c.to_string())]))?
+            },
             Source::Reference(c, s, t) => {
                 let reference = match (c, s, t) {
                     (Some(c), Some(s), t) => TableReference::full(c.as_str(), s.as_str(), t.as_str()),

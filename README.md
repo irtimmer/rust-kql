@@ -81,7 +81,7 @@ parse|✅|❌
 parse-where|✅|❌
 parse-kv|✅|❌
 partition|✅|❌
-range|✅|❌
+range|✅|🚧
 reduce|✅|❌
 render|✅|❌
 sample|✅|❌
